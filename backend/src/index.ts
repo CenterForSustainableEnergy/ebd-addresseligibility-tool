@@ -1,12 +1,14 @@
 import { Hono } from "hono";
+import "dotenv/config";
 
 const app = new Hono();
 
-// 🔑 For demo: only using Auth ID
+// 🔑 Environment variables (from .env at project root)
 const SMARTY_AUTH_ID = process.env.SMARTY_AUTH_ID;
+const SMARTY_AUTH_TOKEN = process.env.SMARTY_AUTH_TOKEN;
 
 // -------------------------------
-// Endpoint 1: Address Validation (Smarty, demo mode with Auth ID only)
+// Endpoint 1: Address Validation (Smarty)
 // -------------------------------
 app.post("/api/validate", async (c) => {
 	try {
@@ -17,14 +19,21 @@ app.post("/api/validate", async (c) => {
 			return c.json({ error: "Missing address input" }, 400);
 		}
 
-		const url = `https://us-street.api.smarty.com/street-address?auth-id=${SMARTY_AUTH_ID}&street=${encodeURIComponent(address)}`;
+		const url =
+			`https://us-street.api.smarty.com/street-address?` +
+			`auth-id=${SMARTY_AUTH_ID}&auth-token=${SMARTY_AUTH_TOKEN}` +
+			`&street=${encodeURIComponent(address)}`;
+
 		const smartyResp = await fetch(url);
 		const smartyData = await smartyResp.json();
 
-		if (!smartyData || smartyData.length === 0) {
-			return c.json({ error: "No match found" });
+		// 🛑 Guard clause — check for empty or invalid response
+		if (!Array.isArray(smartyData) || smartyData.length === 0) {
+			console.error("Smarty API returned:", smartyData);
+			return c.json({ error: "No match found", raw: smartyData }, 404);
 		}
 
+		// ✅ Safe to access [0]
 		const candidate = smartyData[0];
 		const lat = candidate?.metadata?.latitude;
 		const lon = candidate?.metadata?.longitude;
@@ -49,7 +58,10 @@ app.post("/api/overlay", async (c) => {
 			return c.json({ error: "Missing lat/lon input" }, 400);
 		}
 
-		const arcgisUrl = `https://maps3.energycenter.org/arcgis/rest/services/sync/GPServer/LocOverlay_CT/execute?longitude=${lon}&latitude=${lat}&f=pjson`;
+		const arcgisUrl =
+			`https://maps3.energycenter.org/arcgis/rest/services/sync/GPServer/LocOverlay_CT/execute?` +
+			`longitude=${lon}&latitude=${lat}&f=pjson`;
+
 		const arcResp = await fetch(arcgisUrl);
 		const arcData = await arcResp.json();
 
@@ -72,6 +84,9 @@ app.post("/api/overlay", async (c) => {
 		return c.json({ error: "ArcGIS overlay failed" }, 500);
 	}
 });
+
+console.log("Auth ID:", SMARTY_AUTH_ID);
+console.log("Auth Token:", SMARTY_AUTH_TOKEN ? "Loaded" : "Missing");
 
 // -------------------------------
 // Start Bun server
