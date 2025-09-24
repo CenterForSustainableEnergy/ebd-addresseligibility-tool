@@ -1,13 +1,33 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <title>EBD Address Validation Tool (Draft)</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    input, button { padding: 0.5rem; margin: 0.25rem; width: 300px; }
+    #results { margin-top: 2rem; padding: 1rem; border: 1px solid #ccc; }
+    pre { background: #f8f8f8; padding: 1rem; overflow-x: auto; }
+  </style>
+</head>
+<body>
+
+  <h1>EBD Address Validation + Spatial Join Tool</h1>
+
+  <form id="addressForm">
+    <label for="address">Enter Address:</label><br/>
+    <input type="text" id="address" placeholder="123 Main St, City, CA" required />
+    <button type="submit">Validate & Lookup</button>
+  </form>
+
+  <div id="results">
+    <h2>Results</h2>
+    <div id="output"></div>
+    <h3>Debug JSON</h3>
+    <pre id="debug"></pre>
+  </div>
+
+   <script type="module" src="/src/main.ts"></script>
+
+</body>
 </html>

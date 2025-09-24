@@ -2,10 +2,14 @@
   "dependencies": {},
   "devDependencies": {
     "@biomejs/biome": "2.2.4",
+    "concurrently": "^9.2.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.0"
   },
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "dev": "concurrently --kill-others \"bun run backend:dev\" \"bun run frontend:dev\"",
+    "backend:dev": "bun run backend/src/index.ts",
+    "frontend:dev": "cd frontend && bun run dev"
   }
 }
