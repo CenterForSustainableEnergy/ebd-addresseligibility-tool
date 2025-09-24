@@ -1,0 +1,11 @@
+{
+  "dependencies": {},
+  "devDependencies": {
+    "@biomejs/biome": "2.2.4",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.0"
+  },
+  "scripts": {
+    "prepare": "husky"
+  }
+}
