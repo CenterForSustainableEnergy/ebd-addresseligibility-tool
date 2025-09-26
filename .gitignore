@@ -30,4 +30,5 @@ Thumbs.db
 .idea/
 *.swp
 
-
+# Do not commit collected user emails
+backend/data/emails.csv
