@@ -1,5 +1,5 @@
 import "dotenv/config";
-import fs from "fs";
+import fs from "node:fs";
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import Papa from "papaparse";

@@ -78,7 +78,7 @@
 					return;
 				}
 
-				const address = `${street}${city ? ", " + city : ""}, CA ${zip}`;
+				const address = `${street}${city ? `, ${city}` : ""}, CA ${zip}`;
 				const results = container.querySelector("#ebdResults");
 				results.innerHTML = "Searching...";
 
@@ -114,7 +114,7 @@
 					// -----------------------------------------
 					// Add County Income table if data exists
 					// -----------------------------------------
-					if (data.county_income && data.county_income.income_by_household) {
+					if (data.county_income?.income_by_household) {
 						const income = data.county_income.income_by_household;
 						html += `
 							<h3 style="margin-top: 1rem;">County Income Verification (${data.county_income.county})</h3>

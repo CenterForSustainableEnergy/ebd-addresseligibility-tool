@@ -109,6 +109,6 @@ document
 			}
 		} catch (err: any) {
 			console.error(err);
-			outputDiv.innerHTML = "Error: " + err.message;
+			outputDiv.innerHTML = `Error: ${err.message}`;
 		}
 	});
