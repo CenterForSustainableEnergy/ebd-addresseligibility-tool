@@ -176,12 +176,23 @@ app.post("/api/overlay", async (c) => {
 				county_income: countyIncome,
 			});
 
-		if (tractInfo.region !== "Central")
+		if (tractInfo.region === "Southern")
 			return c.json({
 				success: true,
 				eligible: false,
 				tract: displayTract,
-				message: `You are located in the ${tractInfo.region} region.`,
+				message: `The address you entered is outside the coverage territory for this specific program. Visit www.###.com to check your eligibility.`,
+				region: tractInfo.region,
+				action: "redirect",
+				county_income: countyIncome,
+			});
+
+		if (tractInfo.region === "Northern")
+			return c.json({
+				success: true,
+				eligible: false,
+				tract: displayTract,
+				message: `The address you entered is outside the coverage territory for this specific program. Visit www.###.com to check your eligibility.`,
 				region: tractInfo.region,
 				action: "redirect",
 				county_income: countyIncome,
@@ -192,7 +203,8 @@ app.post("/api/overlay", async (c) => {
 				success: true,
 				eligible: false,
 				tract: displayTract,
-				message: "You are in the Central region but not yet eligible.",
+				message:
+					"Looks like your area isn't eligible yet. We're growing! Check back soon or join our mailing list to stay informed as the program expands to your community.",
 				region: "Central",
 				action: "collect-email",
 				county_income: countyIncome,
@@ -203,7 +215,8 @@ app.post("/api/overlay", async (c) => {
 			success: true,
 			eligible: true,
 			tract: displayTract,
-			message: "You are in the Central region and eligible!",
+			message:
+				"You are in the Central region and are geographically eligible! See below for income eligibilty for your area.",
 			region: "Central",
 			county_income: countyIncome,
 		});

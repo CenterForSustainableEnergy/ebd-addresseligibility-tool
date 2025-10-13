@@ -50,17 +50,24 @@
 
 			container.innerHTML = `
 				<div class="ebd-lookup">
-					<h2>Do You Qualify?</h2>
-					<p>Enter your address, city, and ZIP code to check eligibility.</p>
-					<form id="ebdForm">
-						<label>Street Address</label><br>
-						<input type="text" id="ebdAddress" placeholder="123 Main Street" required />
-						<label>City</label><br>
-						<input type="text" id="ebdCity" placeholder="San Diego" />
-						<label>ZIP Code</label><br>
-						<input type="text" id="ebdZip" placeholder="90210" required />
+					<form id="ebdForm" style="display: flex; flex-direction: column; gap: 0.75rem; max-width: 400px;">
+						<div class="form-group">
+							<label for="ebdAddress">Street Address</label>
+							<input type="text" id="ebdAddress" placeholder="123 Main Street" required />
+						</div>
+
+						<div class="form-group">
+							<label for="ebdCity">City</label>
+							<input type="text" id="ebdCity" placeholder="San Diego" />
+						</div>
+
+						<div class="form-group">
+							<label for="ebdZip">ZIP Code</label>
+							<input type="text" id="ebdZip" placeholder="90210" required />
+						</div>
+
 						<button type="submit" id="ebdSubmit">Search</button>
-					</form>
+						</form>
 					<div id="ebdResults" style="margin-top: 1rem;"></div>
 				</div>
 			`;
@@ -94,17 +101,11 @@
 						<table class="ebd-results-table" style="border-collapse: collapse; width: 100%; margin-top: 1rem;">
 							<thead>
 								<tr style="text-align: left;">
-									<th>Standardized Address</th>
-									<th>Coordinates</th>
-									<th>Census Tract</th>
 									<th>Eligibility</th>
 								</tr>
 							</thead>
 							<tbody>
 								<tr>
-									<td>${data.standardized || "—"}</td>
-									<td>${data.lat}, ${data.lon}</td>
-									<td>${data.tract || "—"}</td>
 									<td>${data.message || "—"}</td>
 								</tr>
 							</tbody>
