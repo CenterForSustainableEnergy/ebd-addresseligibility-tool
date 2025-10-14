@@ -98,19 +98,10 @@
 					}
 
 					let html = `
-						<table class="ebd-results-table" style="border-collapse: collapse; width: 100%; margin-top: 1rem;">
-							<thead>
-								<tr style="text-align: left;">
-									<th>Eligibility</th>
-								</tr>
-							</thead>
-							<tbody>
-								<tr>
-									<td>${data.message || "—"}</td>
-								</tr>
-							</tbody>
-						</table>
-					`;
+  <div class="ebd-results" style="margin-top: 1rem; border: 1px solid #ddd; padding: 1rem; border-radius: 0.5rem;">
+    <p><strong>Eligibility:</strong> ${data.message || "—"}</p>
+  </div>
+`;
 
 					// -----------------------------------------
 					// Add County Income table if data exists

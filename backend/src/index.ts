@@ -198,7 +198,7 @@ app.post("/api/overlay", async (c) => {
 				county_income: countyIncome,
 			});
 
-		if (tractInfo.region === "Central" && tractInfo.eligible === "false")
+		if (tractInfo.region === "Central" && tractInfo.eligible === "FALSE")
 			return c.json({
 				success: true,
 				eligible: false,
