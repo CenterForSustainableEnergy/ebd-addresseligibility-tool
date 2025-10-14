@@ -128,14 +128,45 @@ app.post("/api/overlay", async (c) => {
 			`longitude=${lon}&latitude=${lat}&f=pjson`;
 
 		const arcResp = await fetch(arcgisUrl);
-		const arcData = await arcResp.json();
+		const arcText = await arcResp.text();
 
+		// ArcGIS sometimes returns HTML with embedded JSON in <pre> tags
+		const jsonMatch = arcText.match(/{[\s\S]*}/);
+		if (!jsonMatch) {
+			console.error("ArcGIS HTML parse error:", arcText.slice(0, 400));
+			return c.json({ error: "ArcGIS returned unexpected format" }, 500);
+		}
+
+		const arcData = JSON.parse(jsonMatch[0]);
 		let result: any = {};
 		if (arcData?.results?.[0]?.value) result = arcData.results[0].value;
 
-		const tract = result?.tract?.toString().padStart(11, "0");
+		// -----------------------------------
+		// Census Tract from ca_census_tracts_2020
+		// -----------------------------------
+		const tract = result?.ca_census_tracts_2020?.toString().padStart(11, "0");
 		const displayTract = tract?.startsWith("0") ? tract.slice(1) : tract;
 		const tractInfo = tractData.find((t) => t.tract === tract);
+
+		// -----------------------------------
+		// CARB Priority Population Logic
+		// -----------------------------------
+		function normalizeStr(v?: string): string {
+			if (!v) return "";
+			return v
+				.replace(/^preview\s+for\s+/i, "")
+				.trim()
+				.toLowerCase();
+		}
+
+		const INELIGIBLE_VALUES = new Set<string>([
+			"low-income community",
+			"not a priority population area: low-income households are eligible",
+		]);
+
+		const carbRaw = result?.carb_priority_pops_4 as string | undefined;
+		const carbNorm = normalizeStr(carbRaw);
+		const isPriority = carbNorm.length > 0 && !INELIGIBLE_VALUES.has(carbNorm);
 
 		// -----------------------------------
 		// Lookup County Income Data by ZIP
@@ -173,51 +204,65 @@ app.post("/api/overlay", async (c) => {
 				message: `Tract ${displayTract} not found in dataset.`,
 				region: result?.county || "Unknown",
 				action: "redirect",
+				carb_priority: { is_priority: isPriority, label: carbRaw || "" },
 				county_income: countyIncome,
 			});
 
+		// Southern region
 		if (tractInfo.region === "Southern")
 			return c.json({
 				success: true,
 				eligible: false,
 				tract: displayTract,
-				message: `The address you entered is outside the coverage territory for this specific program. Visit www.###.com to check your eligibility.`,
+				message:
+					"The address you entered is outside the coverage territory for this specific program. Visit www.###.com to check your eligibility.",
 				region: tractInfo.region,
 				action: "redirect",
+				carb_priority: { is_priority: isPriority, label: carbRaw || "" },
 				county_income: countyIncome,
 			});
 
+		// Northern region
 		if (tractInfo.region === "Northern")
 			return c.json({
 				success: true,
 				eligible: false,
 				tract: displayTract,
-				message: `The address you entered is outside the coverage territory for this specific program. Visit www.###.com to check your eligibility.`,
+				message:
+					"The address you entered is outside the coverage territory for this specific program. Visit www.###.com to check your eligibility.",
 				region: tractInfo.region,
 				action: "redirect",
+				carb_priority: { is_priority: isPriority, label: carbRaw || "" },
 				county_income: countyIncome,
 			});
 
-		if (tractInfo.region === "Central" && tractInfo.eligible === "FALSE")
+		// Central region - Not Eligible
+		const eligibleVal = String(tractInfo.eligible).trim().toLowerCase();
+		if (tractInfo.region === "Central" && eligibleVal === "false") {
+			const message =
+				"Looks like your area isn't eligible yet. We're growing! Check back soon or join our mailing list to stay informed as the program expands to your community.";
 			return c.json({
 				success: true,
 				eligible: false,
 				tract: displayTract,
-				message:
-					"Looks like your area isn't eligible yet. We're growing! Check back soon or join our mailing list to stay informed as the program expands to your community.",
+				message,
 				region: "Central",
 				action: "collect-email",
+				carb_priority: { is_priority: isPriority, label: carbRaw || "" },
 				county_income: countyIncome,
 			});
+		}
 
-		// Eligible
+		// Central region - Eligible
+		const message =
+			"You are in the Central region and are geographically eligible! See below for income eligibility for your area.";
 		return c.json({
 			success: true,
 			eligible: true,
 			tract: displayTract,
-			message:
-				"You are in the Central region and are geographically eligible! See below for income eligibilty for your area.",
+			message,
 			region: "Central",
+			carb_priority: { is_priority: isPriority, label: carbRaw || "" },
 			county_income: countyIncome,
 		});
 	} catch (err) {
