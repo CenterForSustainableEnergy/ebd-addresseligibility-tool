@@ -52,8 +52,11 @@ cd ebd-addresseligibility-tool
 
 ### 2. To install dependencies:
 
+These should be installed at the project root. 
+
 ```bash
 bun install
+bun add -d vite
 ```
 
 ### 3. Environmental Variables
@@ -93,9 +96,9 @@ You should see:
 
 * Search button
 
-* Results table (standardized address, coordinates, census tract, eligibility)
+* Results table (geographic eligibility)
 
-* County income verification table
+* County income eligibility verification table
 
 * Email capture form (for ineligible Central-region users)
 
