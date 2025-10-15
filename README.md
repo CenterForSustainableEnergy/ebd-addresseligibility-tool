@@ -14,12 +14,13 @@ It can be embedded directly into the EBD program website via a single `<script>`
 
 - **Spatial overlay**  
   → via ArcGIS REST service for census tract and region lookup.
+  → See https://github.com/CenterForSustainableEnergy/geocodeidentify for additional details.
 
 - **Program logic**
-  - Maps **census tract → region + eligibility** using local CSV (`tracts.csv`).
+  - Maps **census tract → region + geographic eligibility** using local CSV (`tracts.csv`).
   - If outside the Central region → displays region + redirect link.
   - If inside Central but ineligible → shows email collection form for future updates.
-  - If eligible → confirms eligibility and displays region.
+  - If eligible → confirms geographic eligibility and directs to income eligibility table.
 
 - **County income verification**  
   - Uses `county_income.csv` to show **maximum eligible income** for household sizes 1–8 by ZIP code.
