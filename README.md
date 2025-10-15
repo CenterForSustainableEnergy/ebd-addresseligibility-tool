@@ -1,49 +1,76 @@
-This project provides a web-based tool for the Equitable Building Decarbonization (EBD) program.
-It validates user-provided addresses, performs spatial overlay, and checks eligibility based on census tract.
+# Equitable Building Decarbonization (EBD) – Address Eligibility Lookup Tool
 
-**Features**
+This project provides a **web-based address lookup and eligibility verification tool** for the Equitable Building Decarbonization (EBD) program.
 
-    * Address validation + geocoding via Smarty US Street API.
+The tool validates user-provided addresses, determines their census tract and region, checks program eligibility, and displays **county-level income thresholds** by household size.  
+It can be embedded directly into the EBD program website via a single `<script>` tag.
 
-    * Spatial overlay with ArcGIS services.
+---
 
-    * Program logic:
+## 🌟 Features
 
-        + Maps census tract → region + eligibility (via local CSV).
+- **Address validation + geocoding**  
+  → via [Smarty US Street API](https://www.smarty.com/products/us-street-api).
 
-        + If outside Central region → show region + redirect link.
+- **Spatial overlay**  
+  → via ArcGIS REST service for census tract and region lookup.
+  → See https://github.com/CenterForSustainableEnergy/geocodeidentify for additional details.
 
-        + If inside Central but ineligible → request email for notifications.
+- **Program logic**
+  - Maps **census tract → region + geographic eligibility** using local CSV (`tracts.csv`).
+  - If outside the Central region → displays region + redirect link.
+  - If inside Central but ineligible → shows email collection form for future updates.
+  - If eligible → confirms geographic eligibility and directs to income eligibility table.
 
-    * Frontend: Vite + TypeScript (vanilla template).
+- **County income verification**  
+  - Uses `county_income.csv` to show **maximum eligible income** for household sizes 1–8 by ZIP code.
 
-    * Backend: Hono + Bun.
+- **Frontend**
+  - Built using **Vite + TypeScript (vanilla template)**.
+  - Exports an embeddable widget (`lookup-widget.min.js`).
 
-    * Developer tooling:
+- **Backend**
+  - Built using **Hono + Bun**.
+  - Handles API requests to Smarty, ArcGIS, and local CSV lookups.
 
-        + Biome for linting/formatting.
+- **Developer tooling**
+  - **Biome** for linting/formatting.
+  - **Husky** for pre-commit hooks (runs Biome automatically).
+  - **Concurrently** for parallel dev mode.
 
-        + Husky pre-commit hooks.
+---
 
+## 🚀 Getting Started (Developers)
 
-**Getting Started**
-
-1. Clone Repository
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/CenterForSustainableEnergy/ebd-addresseligibility-tool.git
-cd <your repo location>
-
+cd ebd-addresseligibility-tool
 ```
 
+### 2. To install dependencies:
 
-2. To install dependencies:
+Install bun (for windows). More details at https://bun.com/docs/installation.
+
+```bash
+powershell -c "irm bun.sh/install.ps1|iex"
+```
+
+OR (if node is available)
+
+```bash
+npm install -g bun
+```
+
+These should be installed at the project root. 
 
 ```bash
 bun install
+bun add -d vite
 ```
 
-3. Environmental Variables
+### 3. Environmental Variables
 Create a new .env file at repo root. Contact John Anderson for Smarty Key access. 
 
 ```ini
@@ -53,32 +80,58 @@ PORT=3000
 ```
 .env is ignored by Git — do not commit it.
 
-4. Run backend
+### 4. Build the Widget
+
+```bash
+bun run build:widget
+```
+Output file:
+frontend/dist/embed/lookup-widget.min.js
+
+### 5. Run the Backend
 
 ```bash
 bun run backend/src/index.ts
 ```
-
 Backend starts on http://localhost:3000.
 
-5. Run frontend
+### 6. Test the Tool Locally
 
 ```bash
-cd frontend
-bun run dev
+http://localhost:3000/test.html
 ```
 
-Frontend starts on http://localhost:5173 and proxies /api requests to the backend.
+You should see:
 
-6. Combined dev (frontend + backend)
+* Address, City, ZIP inputs
 
-At the repo root:
+* Search button
 
-```bash
-bun add -D concurrently 
-bun run dev
+* Results table (geographic eligibility)
+
+* County income eligibility verification table
+
+* Email capture form (for ineligible Central-region users)
+
+
+## Embedding the Widget on a Website
+
+Add this snippet to any webpage:
+
+```html
+<!-- EBD Lookup Tool -->
+<script src="https://yourdomain.org/embed/lookup-widget.min.js"></script>
+<div id="EBDLookupContainer"></div>
+<script>
+  EBDLookup.init("EBDLookupContainer");
+</script>
 ```
-This runs both with concurrently.
+
+The widget automatically:
+* Renders the input form and results table.
+* Calls your backend APIs for validation and overlay.
+* Adopts your site’s CSS styling.
+
 
 Developer Workflow
 
@@ -91,7 +144,7 @@ bun run biome check .
 Auto-fix:
 
 ```bash
-bun run biome check --apply .
+bun run biome check --write .
 ```
 
 Git hooks: Husky runs Biome automatically before each commit.
