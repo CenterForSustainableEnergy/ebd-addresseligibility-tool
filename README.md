@@ -51,6 +51,12 @@ cd ebd-addresseligibility-tool
 
 ### 2. To install dependencies:
 
+Install bun (for windows). More details at https://bun.com/docs/installation.
+
+```bash
+npm install -g bun
+```
+
 These should be installed at the project root. 
 
 ```bash
