@@ -49,8 +49,6 @@ git clone https://github.com/CenterForSustainableEnergy/ebd-addresseligibility-t
 cd ebd-addresseligibility-tool
 ```
 
-
-
 ### 2. To install dependencies:
 
 These should be installed at the project root. 
