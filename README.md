@@ -54,6 +54,12 @@ cd ebd-addresseligibility-tool
 Install bun (for windows). More details at https://bun.com/docs/installation.
 
 ```bash
+powershell -c "irm bun.sh/install.ps1|iex"
+```
+
+OR (if node is available)
+
+```bash
 npm install -g bun
 ```
 
