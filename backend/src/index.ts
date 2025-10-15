@@ -230,7 +230,7 @@ app.post("/api/overlay", async (c) => {
 				eligible: false,
 				tract: displayTract,
 				message:
-					"The address you entered is outside the coverage territory for this specific program. Visit www.###.com to check your eligibility.",
+					"The address you entered is outside the coverage territory for this specific program. Visit https://socalebd.org/ to check your eligibility.",
 				region: tractInfo.region,
 				action: "redirect",
 				carb_priority: { is_priority: isPriority, label: carbRaw || "" },
