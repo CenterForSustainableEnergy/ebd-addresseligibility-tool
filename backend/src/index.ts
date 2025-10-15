@@ -2,6 +2,7 @@ import "dotenv/config";
 import fs from "node:fs";
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
+import { rateLimiter } from "hono-rate-limiter";
 import Papa from "papaparse";
 
 // -----------------------------------
@@ -76,9 +77,23 @@ app.use("/embed/*", serveStatic({ root: "./frontend/dist" }));
 app.use("/*", serveStatic({ root: "./backend/public" }));
 
 // -----------------------------------
+// Rate Limiter (in-memory)
+// -----------------------------------
+
+// Simple limiter: max 5 requests per second per IP address
+const limiter = rateLimiter({
+	windowMs: 1000, // time window in milliseconds
+	limit: 5, // max requests per window per IP
+	standardHeaders: true, // adds RateLimit-* headers
+	keyGenerator: (c) =>
+		c.req.header("x-forwarded-for") ||
+		c.req.raw?.connection?.remoteAddress ||
+		"unknown",
+});
+// -----------------------------------
 // Endpoint 1: Address Validation (Smarty)
 // -----------------------------------
-app.post("/api/validate", async (c) => {
+app.post("/api/validate", limiter, async (c) => {
 	try {
 		const body = await c.req.json<{ address?: string }>();
 		const address = body.address?.trim();

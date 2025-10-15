@@ -1,6 +1,7 @@
 {
 	"dependencies": {
 		"dotenv": "^17.2.2",
+		"hono-rate-limiter": "^0.4.2",
 		"papaparse": "^5.5.3"
 	},
 	"devDependencies": {
