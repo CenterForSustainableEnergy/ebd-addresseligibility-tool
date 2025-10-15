@@ -10,6 +10,8 @@ import Papa from "papaparse";
 // -----------------------------------
 const SMARTY_AUTH_ID = process.env.SMARTY_AUTH_ID;
 const SMARTY_AUTH_TOKEN = process.env.SMARTY_AUTH_TOKEN;
+const SIGNUP_URL =
+	process.env.SIGNUP_URL ?? "https://ebd.energycenter.org/#mk-form";
 
 // -----------------------------------
 // Load Tract Eligibility Data
@@ -251,7 +253,7 @@ app.post("/api/overlay", async (c) => {
 				county_income: countyIncome,
 			});
 
-		// Central region - Not Eligible
+		// Central region - Not Eligible (link out instead of collecting emails)
 		const eligibleVal = String(tractInfo.eligible).trim().toLowerCase();
 		if (tractInfo.region === "Central" && eligibleVal === "false") {
 			const message =
@@ -262,7 +264,8 @@ app.post("/api/overlay", async (c) => {
 				tract: displayTract,
 				message,
 				region: "Central",
-				action: "collect-email",
+				action: "visit-signup", // <-- new action
+				signup_url: SIGNUP_URL, // <-- provide link for the UI
 				carb_priority: { is_priority: isPriority, label: carbRaw || "" },
 				county_income: countyIncome,
 			});
@@ -283,31 +286,6 @@ app.post("/api/overlay", async (c) => {
 	} catch (err) {
 		console.error("ArcGIS API error:", err);
 		return c.json({ error: "ArcGIS overlay failed" }, 500);
-	}
-});
-
-// -----------------------------------
-// Endpoint 3: Save Notification Emails
-// -----------------------------------
-app.post("/api/notify", async (c) => {
-	try {
-		const body = await c.req.json<{ email?: string; tract?: string }>();
-		const email = body.email?.trim();
-		const tract = body.tract || "";
-
-		if (!email) return c.json({ error: "Missing email" }, 400);
-
-		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-		if (!emailRegex.test(email))
-			return c.json({ error: "Invalid email format" }, 400);
-
-		const line = `${new Date().toISOString()},${tract},${email}\n`;
-		fs.appendFileSync("backend/data/emails.csv", line, "utf8");
-
-		return c.json({ success: true, message: "Email saved for notifications." });
-	} catch (err) {
-		console.error("Notify API error:", err);
-		return c.json({ error: "Failed to save email" }, 500);
 	}
 });
 

@@ -29,18 +29,6 @@
 	}
 
 	// -----------------------------------------
-	// Save notification email
-	// -----------------------------------------
-	async function sendNotify(email, tract) {
-		const resp = await fetch("/api/notify", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ email, tract }),
-		});
-		return await resp.json();
-	}
-
-	// -----------------------------------------
 	// Build the widget and attach logic
 	// -----------------------------------------
 	window.EBDLookup = {
@@ -136,55 +124,34 @@
 					// -----------------------------------------
 					// Add email form if ineligible Central region
 					// -----------------------------------------
-					if (
-						data.action === "collect-email" ||
-						(data.region === "Central" && !data.eligible)
-					) {
+					if (data.action === "redirect" && data.link) {
 						html += `
-							<div id="notifySection" style="margin-top: 1.5rem;">
-								<p>You're in the Central region but not currently eligible. Enter your email below and we'll notify you when eligibility expands.</p>
-								<form id="notifyForm">
-									<label>Email:</label>
-									<input type="email" id="notifyEmail" placeholder="name@example.com" required />
-									<button type="submit">Notify Me</button>
-								</form>
-								<div id="notifyMessage" style="margin-top:0.5rem;"></div>
-							</div>
-						`;
+             <p style="margin-top:1rem;">
+               <a href="${data.link}" target="_blank" rel="noopener noreferrer">
+                 Visit program site for ${data.region || "your region"}
+               </a>
+             </p>
+           `;
+					}
+
+					// 2) Visit-signup (expects backend to include `signup_url`)
+					if (data.action === "visit-signup" && data.signup_url) {
+						const url = new URL(data.signup_url, window.location.origin);
+						if (data.tract) url.searchParams.set("tract", data.tract);
+						if (data.zipcode) url.searchParams.set("zip", String(data.zipcode));
+						html += `
+             <div id="notifySection" style="margin-top: 1.5rem;">
+               <p>You're in the Central region but not currently eligible. Join our mailing list to be notified when eligibility expands.</p>
+               <p>
+                 <a href="${url.toString()}" target="_blank" rel="noopener noreferrer">
+                   Join the mailing list
+                 </a>
+               </p>
+             </div>
+           `;
 					}
 
 					results.innerHTML = html;
-
-					// -----------------------------------------
-					// Handle email submission
-					// -----------------------------------------
-					const notifyForm = results.querySelector("#notifyForm");
-					if (notifyForm) {
-						notifyForm.addEventListener("submit", async (e) => {
-							e.preventDefault();
-							const email = results.querySelector("#notifyEmail").value.trim();
-							const msg = results.querySelector("#notifyMessage");
-
-							if (!email) {
-								msg.textContent = "Please enter a valid email.";
-								return;
-							}
-
-							try {
-								const resp = await sendNotify(email, data.tract || "");
-								if (resp.success) {
-									msg.textContent = `✅ Thanks! We'll notify you at ${email}.`;
-									notifyForm.reset();
-								} else {
-									msg.textContent = `⚠️ ${resp.error || "Unable to save email."}`;
-								}
-							} catch (err) {
-								console.error(err);
-								msg.textContent =
-									"⚠️ Error saving email. Please try again later.";
-							}
-						});
-					}
 				} catch (err) {
 					console.error(err);
 					results.innerHTML = "Error retrieving results.";
