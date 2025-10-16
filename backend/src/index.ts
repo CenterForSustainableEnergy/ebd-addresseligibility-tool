@@ -80,8 +80,8 @@ const app = new Hono();
 // -----------------------------------
 const allowedOrigins = new Set<string>([
   'https://ebd.energycenter.org',
-  'https://dev-ebd.energycenter.org',
-  'https://test-ebd.energycenter.org',
+  'https://dev-ebd-program.pantheonsite.io',
+  'https://test-ebd-program.pantheonsite.io',
   'https://ebd-program.lndo.site'
 ]);
 
