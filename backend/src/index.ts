@@ -293,11 +293,13 @@ app.post("/api/overlay", async (c) => {
 // Health Check
 // -----------------------------------
 app.get("/", (c) => c.text("Backend is running ✅"));
+app.get("/api/health", (c) => c.json({ ok: true, ts: Date.now() }));
 
 // -----------------------------------
 // Start Bun Server
 // -----------------------------------
 export default {
+	hostname: "127.0.0.1",
 	port: process.env.PORT || 3000,
 	fetch: app.fetch,
 };

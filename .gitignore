@@ -17,6 +17,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+logs/*
 
 # Husky internals (but keep hook scripts)
 .husky/_/
