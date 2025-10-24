@@ -281,8 +281,11 @@ app.post("/api/overlay", async (c) => {
 		// Central region - Not Eligible (link out instead of collecting emails)
 		const eligibleVal = String(tractInfo.eligible).trim().toLowerCase();
 		if (tractInfo.region === "Central" && eligibleVal === "false") {
-			const message =
-				"Looks like your area isn't eligible yet. We're growing! Check back soon or join our mailing list to stay informed as the program expands to your community.";
+			const message = `Looks like your area isn't eligible yet. We're growing! Check back soon or 
+			<a href="https://ebd.energycenter.org/#mk-form" target="_blank" rel="noopener noreferrer">
+				join our mailing list
+			</a> 
+			to stay informed as the program expands to your community.`;
 			return c.json({
 				success: true,
 				eligible: false,
@@ -297,8 +300,19 @@ app.post("/api/overlay", async (c) => {
 		}
 
 		// Central region - Eligible
-		const message =
-			"You are in the Central region and are geographically eligible! See below for income eligibility for your area.";
+		const message = `
+			It appears that your address may be within the eligible area for this program. 
+			Please review the table below to see if your household income also meets the eligibility requirements.
+			<br><br>
+			If your income falls below the listed threshold, you can visit the application portal 
+			to complete the next steps for upgrading your home.
+			<br><br>
+			<em>Note:</em> Income limits are current as of April 23, 2025 and may change based on 
+			federal or state guidelines. 
+			<a href="https://www.hcd.ca.gov/sites/default/files/docs/grants-and-funding/income-limits-2025.pdf" 
+				target="_blank" rel="noopener noreferrer">Click here</a> 
+			to learn more about income limits.
+`;
 		return c.json({
 			success: true,
 			eligible: true,
