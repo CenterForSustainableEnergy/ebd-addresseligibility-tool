@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { rateLimiter } from "hono-rate-limiter";
 import Papa from "papaparse";
+import { cors } from 'hono/cors';
 
 // -----------------------------------
 // Environment Variables
@@ -74,7 +75,31 @@ const countyIncomeData: CountyIncome[] = Papa.parse<CountyIncome>(
 // -----------------------------------
 const app = new Hono();
 
+// -----------------------------------
+// CORS setup
+// -----------------------------------
+const allowedOrigins = new Set<string>([
+  'https://ebd.energycenter.org',
+  'https://dev-ebd-program.pantheonsite.io',
+  'https://test-ebd-program.pantheonsite.io',
+  'https://ebd-program.lndo.site'
+]);
+
+
+const corsMiddleware = cors({
+  origin: (origin) => (origin && allowedOrigins.has(origin)) ? origin : false,
+  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  maxAge: 600,
+});
+
+app.use('/api/*', corsMiddleware);
+app.options('/api/*', corsMiddleware);
+
+// -------------------
 // Serve Static Files
+// -------------------
 app.use("/embed/*", serveStatic({ root: "./frontend/dist" }));
 app.use("/*", serveStatic({ root: "./backend/public" }));
 
@@ -92,6 +117,9 @@ const limiter = rateLimiter({
 		c.req.raw?.connection?.remoteAddress ||
 		"unknown",
 });
+
+
+
 // -----------------------------------
 // Endpoint 1: Address Validation (Smarty)
 // -----------------------------------
@@ -293,11 +321,13 @@ app.post("/api/overlay", async (c) => {
 // Health Check
 // -----------------------------------
 app.get("/", (c) => c.text("Backend is running ✅"));
+app.get("/api/health", (c) => c.json({ ok: true, ts: Date.now() }));
 
 // -----------------------------------
 // Start Bun Server
 // -----------------------------------
 export default {
-	port: process.env.PORT || 3000,
+	hostname: "127.0.0.1",
+	port: Number(process.env.PORT) || 3000,
 	fetch: app.fetch,
 };
