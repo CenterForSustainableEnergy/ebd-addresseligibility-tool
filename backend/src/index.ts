@@ -186,9 +186,12 @@ app.post("/api/overlay", async (c) => {
 		// -----------------------------------
 		// Census Tract from ca_census_tracts_2020
 		// -----------------------------------
-		const tract = result?.ca_census_tracts_2020?.toString().padStart(11, "0");
-		const displayTract = tract?.startsWith("0") ? tract.slice(1) : tract;
-		const tractInfo = tractData.find((t) => t.tract === tract);
+		// --- Census tract extraction ---
+		const tractRaw = result?.ca_census_tracts_2020;
+		const tract = tractRaw ? tractRaw.toString().padStart(11, "0") : null;
+		const displayTract =
+			tract && tract.startsWith("0") ? tract.slice(1) : tract;
+		const tractInfo = tract ? tractData.find((t) => t.tract === tract) : null;
 
 		// -----------------------------------
 		// CARB Priority Population Logic
@@ -238,17 +241,21 @@ app.post("/api/overlay", async (c) => {
 		// -----------------------------------
 		// Eligibility Logic
 		// -----------------------------------
-		if (!tractInfo)
+		// --- Guard: no tract or tract not in California dataset ---
+		if (!tract || !tractInfo) {
 			return c.json({
-				success: true,
+				success: false,
 				eligible: false,
-				tract: displayTract,
-				message: `Tract ${displayTract} not found in dataset.`,
-				region: result?.county || "Unknown",
+				tract: displayTract || "N/A",
+				message:
+					"The address you entered is outside the coverage territory for this program. Please ensure the address is within California and try again.",
+				region: "Out of area",
 				action: "redirect",
-				carb_priority: { is_priority: isPriority, label: carbRaw || "" },
-				county_income: countyIncome,
+				link: "https://socalebd.org/", // optional redirect for out-of-area users
+				carb_priority: { is_priority: false, label: "" },
+				county_income: null,
 			});
+		}
 
 		// Southern region
 		if (tractInfo.region === "Southern")
