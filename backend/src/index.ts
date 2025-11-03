@@ -2,9 +2,9 @@ import "dotenv/config";
 import fs from "node:fs";
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
+import { cors } from "hono/cors";
 import { rateLimiter } from "hono-rate-limiter";
 import Papa from "papaparse";
-import { cors } from 'hono/cors';
 
 // -----------------------------------
 // Environment Variables
@@ -79,23 +79,22 @@ const app = new Hono();
 // CORS setup
 // -----------------------------------
 const allowedOrigins = new Set<string>([
-  'https://ebd.energycenter.org',
-  'https://dev-ebd-program.pantheonsite.io',
-  'https://test-ebd-program.pantheonsite.io',
-  'https://ebd-program.lndo.site'
+	"https://ebd.energycenter.org",
+	"https://dev-ebd-program.pantheonsite.io",
+	"https://test-ebd-program.pantheonsite.io",
+	"https://ebd-program.lndo.site",
 ]);
 
-
 const corsMiddleware = cors({
-  origin: (origin) => (origin && allowedOrigins.has(origin)) ? origin : false,
-  allowMethods: ['GET', 'POST', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  maxAge: 600,
+	origin: (origin) => (origin && allowedOrigins.has(origin) ? origin : false),
+	allowMethods: ["GET", "POST", "OPTIONS"],
+	allowHeaders: ["Content-Type", "Authorization"],
+	credentials: true,
+	maxAge: 600,
 });
 
-app.use('/api/*', corsMiddleware);
-app.options('/api/*', corsMiddleware);
+app.use("/api/*", corsMiddleware);
+app.options("/api/*", corsMiddleware);
 
 // -------------------
 // Serve Static Files
@@ -117,8 +116,6 @@ const limiter = rateLimiter({
 		c.req.raw?.connection?.remoteAddress ||
 		"unknown",
 });
-
-
 
 // -----------------------------------
 // Endpoint 1: Address Validation (Smarty)
@@ -189,9 +186,12 @@ app.post("/api/overlay", async (c) => {
 		// -----------------------------------
 		// Census Tract from ca_census_tracts_2020
 		// -----------------------------------
-		const tract = result?.ca_census_tracts_2020?.toString().padStart(11, "0");
-		const displayTract = tract?.startsWith("0") ? tract.slice(1) : tract;
-		const tractInfo = tractData.find((t) => t.tract === tract);
+		// --- Census tract extraction ---
+		const tractRaw = result?.ca_census_tracts_2020;
+		const tract = tractRaw ? tractRaw.toString().padStart(11, "0") : null;
+		const displayTract =
+			tract && tract.startsWith("0") ? tract.slice(1) : tract;
+		const tractInfo = tract ? tractData.find((t) => t.tract === tract) : null;
 
 		// -----------------------------------
 		// CARB Priority Population Logic
@@ -241,17 +241,21 @@ app.post("/api/overlay", async (c) => {
 		// -----------------------------------
 		// Eligibility Logic
 		// -----------------------------------
-		if (!tractInfo)
+		// --- Guard: no tract or tract not in California dataset ---
+		if (!tract || !tractInfo) {
 			return c.json({
-				success: true,
+				success: false,
 				eligible: false,
-				tract: displayTract,
-				message: `Tract ${displayTract} not found in dataset.`,
-				region: result?.county || "Unknown",
+				tract: displayTract || "N/A",
+				message:
+					"The address you entered is outside the coverage territory for this program. Please ensure the address is within California and try again.",
+				region: "Out of area",
 				action: "redirect",
-				carb_priority: { is_priority: isPriority, label: carbRaw || "" },
-				county_income: countyIncome,
+				link: "https://socalebd.org/", // optional redirect for out-of-area users
+				carb_priority: { is_priority: false, label: "" },
+				county_income: null,
 			});
+		}
 
 		// Southern region
 		if (tractInfo.region === "Southern")
@@ -284,8 +288,11 @@ app.post("/api/overlay", async (c) => {
 		// Central region - Not Eligible (link out instead of collecting emails)
 		const eligibleVal = String(tractInfo.eligible).trim().toLowerCase();
 		if (tractInfo.region === "Central" && eligibleVal === "false") {
-			const message =
-				"Looks like your area isn't eligible yet. We're growing! Check back soon or join our mailing list to stay informed as the program expands to your community.";
+			const message = `Looks like your area isn't eligible yet. We're growing! Check back soon or 
+			<a href="https://ebd.energycenter.org/#mk-form" target="_blank" rel="noopener noreferrer">
+				join our mailing list
+			</a> 
+			to stay informed as the program expands to your community.`;
 			return c.json({
 				success: true,
 				eligible: false,
@@ -300,8 +307,19 @@ app.post("/api/overlay", async (c) => {
 		}
 
 		// Central region - Eligible
-		const message =
-			"You are in the Central region and are geographically eligible! See below for income eligibility for your area.";
+		const message = `
+			It appears that your address may be within the eligible area for this program. 
+			Please review the table below to see if your household income also meets the eligibility requirements.
+			<br><br>
+			If your income falls below the listed threshold, you can visit the application portal 
+			to complete the next steps for upgrading your home.
+			<br><br>
+			<em>Note:</em> Income limits are current as of April 23, 2025 and may change based on 
+			federal or state guidelines. 
+			<a href="https://www.hcd.ca.gov/sites/default/files/docs/grants-and-funding/income-limits-2025.pdf" 
+				target="_blank" rel="noopener noreferrer">Click here</a> 
+			to learn more about income limits.
+`;
 		return c.json({
 			success: true,
 			eligible: true,

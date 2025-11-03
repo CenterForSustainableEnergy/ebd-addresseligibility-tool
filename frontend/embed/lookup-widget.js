@@ -94,62 +94,67 @@
 					// -----------------------------------------
 					// Add County Income table if data exists
 					// -----------------------------------------
-					if (data.county_income?.income_by_household) {
+					// Show income verification table only if Central region AND eligible
+					if (
+						data.region === "Central" &&
+						data.eligible === true &&
+						data.county_income &&
+						data.county_income.income_by_household
+					) {
 						const income = data.county_income.income_by_household;
 						html += `
-							<h3 style="margin-top: 1rem;">County Income Verification (${data.county_income.county})</h3>
-							<table class="ebd-income-table" style="border-collapse: collapse; width: 100%;">
-								<thead>
-									<tr style="text-align: left;">
-										<th>Household Size</th>
-										<th>Maximum Eligible Income</th>
-									</tr>
-								</thead>
-								<tbody>
-									${Object.keys(income)
-										.map((size) => {
-											const val = income[size];
-											const displayVal =
-												typeof val === "number"
-													? `$${val.toLocaleString()}`
-													: `$${Number(val).toLocaleString()}`;
-											return `<tr><td>${size}</td><td>${displayVal}</td></tr>`;
-										})
-										.join("")}
-								</tbody>
-							</table>
-						`;
+						<h3 style="margin-top: 1rem;">County Income Verification (${data.county_income.county})</h3>
+						<table class="ebd-income-table" style="border-collapse: collapse; width: 100%;">
+						<thead>
+							<tr style="text-align: left;">
+							<th>Household Size</th>
+							<th>Maximum Eligible Income</th>
+							</tr>
+						</thead>
+						<tbody>
+							${Object.keys(income)
+								.map((size) => {
+									const val = Number(income[size]);
+									const displayVal = Number.isFinite(val)
+										? `$${val.toLocaleString()}`
+										: "—";
+									return `<tr><td>${size}</td><td>${displayVal}</td></tr>`;
+								})
+								.join("")}
+						</tbody>
+						</table>
+					`;
 					}
 
 					// -----------------------------------------
 					// Add email form if ineligible Central region
 					// -----------------------------------------
-					if (data.action === "redirect" && data.link) {
-						html += `
-             <p style="margin-top:1rem;">
-               <a href="${data.link}" target="_blank" rel="noopener noreferrer">
-                 Visit program site for ${data.region || "your region"}
-               </a>
-             </p>
-           `;
-					}
+					// 			if (data.action === "redirect" && data.link) {
+					// 				html += `
+					//      <p style="margin-top:1rem;">
+					//        <a href="${data.link}" target="_blank" rel="noopener noreferrer">
+					//          Visit program site for ${data.region || "your region"}
+					//        </a>
+					//      </p>
+					//    `;
+					// 			}
 
 					// 2) Visit-signup (expects backend to include `signup_url`)
-					if (data.action === "visit-signup" && data.signup_url) {
-						const url = new URL(data.signup_url, window.location.origin);
-						if (data.tract) url.searchParams.set("tract", data.tract);
-						if (data.zipcode) url.searchParams.set("zip", String(data.zipcode));
-						html += `
-             <div id="notifySection" style="margin-top: 1.5rem;">
-               <p>You're in the Central region but not currently eligible. Join our mailing list to be notified when eligibility expands.</p>
-               <p>
-                 <a href="${url.toString()}" target="_blank" rel="noopener noreferrer">
-                   Join the mailing list
-                 </a>
-               </p>
-             </div>
-           `;
-					}
+					// 			if (data.action === "visit-signup" && data.signup_url) {
+					// 				const url = new URL(data.signup_url, window.location.origin);
+					// 				if (data.tract) url.searchParams.set("tract", data.tract);
+					// 				if (data.zipcode) url.searchParams.set("zip", String(data.zipcode));
+					// 				html += `
+					//      <div id="notifySection" style="margin-top: 1.5rem;">
+					//        <p>You're in the Central region but not currently eligible. Join our mailing list to be notified when eligibility expands.</p>
+					//        <p>
+					//          <a href="${url.toString()}" target="_blank" rel="noopener noreferrer">
+					//            Join the mailing list
+					//          </a>
+					//        </p>
+					//      </div>
+					//    `;
+					// 			}
 
 					results.innerHTML = html;
 				} catch (err) {
