@@ -97,6 +97,8 @@ app.post("/api/upload-csv", async (c) => {
 
 				const value = arcData?.results?.[0]?.value || {};
 
+				// console.log("ArcGIS keys:", Object.keys(value));
+
 				// Extract ZIP from Smarty
 				const zip = candidate.components?.zipcode || "";
 
@@ -114,7 +116,8 @@ app.post("/api/upload-csv", async (c) => {
 					SenateDistrict: value.SenateDistrict || "",
 					CaliforniaClimateZone: climateZone,
 					DisadvantagedCommunity: value.dac || "",
-					WithinHalfMileOfADisadvantagedCommunity: value.dac_buffer || "",
+					WithinHalfMileOfADisadvantagedCommunity:
+						value.carb_priority_pops_4 || "",
 					LowIncomeCommunity: value.lic || "",
 				});
 			} catch (err) {
