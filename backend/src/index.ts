@@ -2,9 +2,9 @@ import "dotenv/config";
 import fs from "node:fs";
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
+import { cors } from "hono/cors";
 import { rateLimiter } from "hono-rate-limiter";
 import Papa from "papaparse";
-import { cors } from 'hono/cors';
 
 // -----------------------------------
 // Environment Variables
@@ -79,23 +79,22 @@ const app = new Hono();
 // CORS setup
 // -----------------------------------
 const allowedOrigins = new Set<string>([
-  'https://ebd.energycenter.org',
-  'https://dev-ebd-program.pantheonsite.io',
-  'https://test-ebd-program.pantheonsite.io',
-  'https://ebd-program.lndo.site'
+	"https://ebd.energycenter.org",
+	"https://dev-ebd-program.pantheonsite.io",
+	"https://test-ebd-program.pantheonsite.io",
+	"https://ebd-program.lndo.site",
 ]);
 
-
 const corsMiddleware = cors({
-  origin: (origin) => (origin && allowedOrigins.has(origin)) ? origin : false,
-  allowMethods: ['GET', 'POST', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  maxAge: 600,
+	origin: (origin) => (origin && allowedOrigins.has(origin) ? origin : false),
+	allowMethods: ["GET", "POST", "OPTIONS"],
+	allowHeaders: ["Content-Type", "Authorization"],
+	credentials: true,
+	maxAge: 600,
 });
 
-app.use('/api/*', corsMiddleware);
-app.options('/api/*', corsMiddleware);
+app.use("/api/*", corsMiddleware);
+app.options("/api/*", corsMiddleware);
 
 // -------------------
 // Serve Static Files
@@ -117,8 +116,6 @@ const limiter = rateLimiter({
 		c.req.raw?.connection?.remoteAddress ||
 		"unknown",
 });
-
-
 
 // -----------------------------------
 // Endpoint 1: Address Validation (Smarty)
