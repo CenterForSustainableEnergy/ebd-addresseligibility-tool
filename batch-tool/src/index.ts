@@ -37,7 +37,10 @@ const app = new Hono();
 app.use("*", cors());
 
 // Serve static results (optional)
-app.use("/results/*", serveStatic({ root: "./data" }));
+// app.use("/results/*", serveStatic({ root: "./data" }));
+
+// Serve the static web page from /public
+app.use("/*", serveStatic({ root: "./public" }));
 
 // ------------------------------
 // POST /api/upload-csv
@@ -107,6 +110,28 @@ app.post("/api/upload-csv", async (c) => {
 				const zipClimateZone = zip ? climateZoneByZip.get(zip) || "" : "";
 				const climateZone = arcClimateZone || zipClimateZone || "N/A";
 
+				// --- Normalize CARB Priority Populations field ---
+				const carbPriority = value.carb_priority_pops_4 || "";
+				const carbPriorityClean =
+					typeof carbPriority === "string" ? carbPriority.trim() : "";
+
+				// --- Determine CARB Eligibility ---
+				const ineligibleValues = new Set([
+					"low-income community",
+					"not a priority population area: low-income households are eligible",
+				]);
+
+				const carbNorm = carbPriorityClean.toLowerCase();
+				const carbEligible = carbPriorityClean
+					? !ineligibleValues.has(carbNorm)
+					: false;
+				const carbEligibilityLabel = carbPriorityClean
+					? carbEligible
+						? "Eligible"
+						: "Not Eligible"
+					: "Unknown";
+
+				// --- Push record ---
 				results.push({
 					InputAddress: address,
 					StandardizedAddress: `${candidate.delivery_line_1}, ${candidate.last_line}`,
@@ -116,9 +141,9 @@ app.post("/api/upload-csv", async (c) => {
 					SenateDistrict: value.SenateDistrict || "",
 					CaliforniaClimateZone: climateZone,
 					DisadvantagedCommunity: value.dac || "",
-					WithinHalfMileOfADisadvantagedCommunity:
-						value.carb_priority_pops_4 || "",
 					LowIncomeCommunity: value.lic || "",
+					CARB_PriorityPopulation: carbPriorityClean || "N/A",
+					WithinHalfMileOfADisadvantagedCommunity: carbEligibilityLabel,
 				});
 			} catch (err) {
 				console.error("Error processing address:", address, err);
