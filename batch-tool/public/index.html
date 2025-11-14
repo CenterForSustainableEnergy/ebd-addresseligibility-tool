@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>EBD Batch Lookup Tool</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 2rem; background: #fafafa; }
+      h1 { color: #1b365d; }
+      form { border: 1px solid #ccc; padding: 1.5rem; border-radius: 8px; background: #fff; width: 450px; }
+      input[type="file"] { margin: 1rem 0; }
+      button { background: #1b365d; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 4px; cursor: pointer; }
+      button:hover { background: #2b4c85; }
+      #output { margin-top: 1.5rem; }
+      #downloadLink { display: block; margin-top: 1rem; font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    <h1>EBD Batch Address Lookup</h1>
+    <p>Upload a CSV file with a header column named <code>address</code>.</p>
+
+    <form id="uploadForm" enctype="multipart/form-data">
+      <input type="file" name="file" accept=".csv" required />
+      <button type="submit">Upload and Process</button>
+    </form>
+
+    <div id="output"></div>
+
+    <script>
+      document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const fileInput = form.querySelector('input[type="file"]');
+        const output = document.getElementById("output");
+        if (!fileInput.files.length) return alert("Please choose a CSV file.");
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+
+        output.textContent = "Processing...";
+        try {
+          const resp = await fetch("/api/upload-csv", { method: "POST", body: formData });
+          const data = await resp.json();
+          if (data.download) {
+            output.innerHTML = `
+              ✅ Processed ${data.count} addresses.<br>
+              <a id="downloadLink" href="${data.download}" target="_blank">Download Results CSV</a>
+            `;
+          } else {
+            output.textContent = "Error: " + (data.error || "Unknown");
+          }
+        } catch (err) {
+          output.textContent = "Upload failed: " + err.message;
+        }
+      });
+    </script>
+  </body>
+</html>
