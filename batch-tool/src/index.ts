@@ -4,43 +4,67 @@ import { createObjectCsvWriter } from "csv-writer";
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
-import fetch from "node-fetch";
+// import fetch from "node-fetch";
 import Papa from "papaparse";
 
 import XLSX from "xlsx";
 
-// --- Load Building Climate Zones by ZIP Code ---
-const climateWorkbook = XLSX.readFile(
-	"./data/BuildingClimateZonesByZIPCode_ada.xlsx",
-);
-const climateSheet = climateWorkbook.Sheets[climateWorkbook.SheetNames[0]];
-const climateData = XLSX.utils.sheet_to_json<{
-	"Zip Code": string;
-	"Building CZ": string;
-}>(climateSheet);
+// --- Load Building Climate Zones by ZIP Code (optional) ---
+let climateZoneByZip = new Map<string, string>();
+try {
+	const climatePath = path.resolve("./data/BuildingClimateZonesByZIPCode_ada.xlsx");
+	if (fs.existsSync(climatePath)) {
+		const climateWorkbook = XLSX.readFile(climatePath);
+		const climateSheet = climateWorkbook.Sheets[climateWorkbook.SheetNames[0]];
+		const climateData = XLSX.utils.sheet_to_json<{
+			"Zip Code": string;
+			"Building CZ": string;
+		}>(climateSheet);
 
-// Create a lookup map (ZIP → Building CZ)
-const climateZoneByZip = new Map(
-	climateData.map((row) => [
-		String(row["Zip Code"]).padStart(5, "0"),
-		row["Building CZ"],
-	]),
-);
+		// Create a lookup map (ZIP → Building CZ)
+		climateZoneByZip = new Map(
+			climateData.map((row) => [
+				String(row["Zip Code"]).padStart(5, "0"),
+				row["Building CZ"],
+			]),
+		);
 
-console.log(`✅ Loaded ${climateZoneByZip.size} ZIP → Climate Zone records.`);
+		console.log(`✅ Loaded ${climateZoneByZip.size} ZIP → Climate Zone records.`);
+	} else {
+		console.warn(`⚠️ Climate workbook not found at ${climatePath}; ZIP-based climate lookup disabled.`);
+	}
+} catch (err) {
+	console.warn("⚠️ Failed to load climate workbook; continuing without ZIP-based climate lookup.", err);
+}
 
-// Load environment
-const SMARTY_AUTH_ID = process.env.SMARTY_AUTH_ID!;
-const SMARTY_AUTH_TOKEN = process.env.SMARTY_AUTH_TOKEN!;
+// Load environment and validate required credentials
+const SMARTY_AUTH_ID = process.env.SMARTY_AUTH_ID;
+const SMARTY_AUTH_TOKEN = process.env.SMARTY_AUTH_TOKEN;
+if (!SMARTY_AUTH_ID || !SMARTY_AUTH_TOKEN) {
+	console.error("Missing SMARTY_AUTH_ID or SMARTY_AUTH_TOKEN environment variables. Exiting.");
+	process.exit(1);
+}
 
 const app = new Hono();
 app.use("*", cors());
 
-// Serve static results (optional)
-// app.use("/results/*", serveStatic({ root: "./data" }));
+// Serve static results (so callers can download CSV output)
+app.use("/results/*", serveStatic({ root: "./data" }));
 
-// Serve the static web page from /public
-app.use("/*", serveStatic({ root: "./public" }));
+// Serve main HTML page at "/"
+app.get("/", async (c) => {
+  const filePath = path.join(process.cwd(), "public", "index.html");
+  const html = await fs.promises.readFile(filePath, "utf8");
+  return c.html(html);
+});
+
+// Serve all other static assets (JS, CSS, images)
+app.use(
+  "*",
+  serveStatic({
+    root: path.join(process.cwd(), "public"),
+  })
+);
 
 // ------------------------------
 // POST /api/upload-csv
@@ -90,8 +114,16 @@ app.post("/api/upload-csv", async (c) => {
 				}
 
 				const candidate = smartyData[0];
-				const lat = candidate.metadata.latitude;
-				const lon = candidate.metadata.longitude;
+				const lat = candidate?.metadata?.latitude;
+				const lon = candidate?.metadata?.longitude;
+
+				if (lat == null || lon == null) {
+					results.push({
+						InputAddress: address,
+						Error: "No coordinates returned from Smarty",
+					});
+					continue;
+				}
 
 				// Step 2: ArcGIS overlay
 				const arcgisUrl = `https://maps3.energycenter.org/arcgis/rest/services/sync/GPServer/LocOverlay_CT/execute?longitude=${lon}&latitude=${lat}&returnZ=false&returnM=false&returnTrueCurves=false&returnFeatureCollection=false&returnColumnName=false&simplifyFeatures=true&context=&f=pjson`;
@@ -153,11 +185,16 @@ app.post("/api/upload-csv", async (c) => {
 
 		// Step 3: Write results to CSV
 		const outputPath = path.join("./data", "batch_results.csv");
-		const csvWriter = createObjectCsvWriter({
-			path: outputPath,
-			header: Object.keys(results[0]).map((key) => ({ id: key, title: key })),
-		});
-		await csvWriter.writeRecords(results);
+		if (!results.length) {
+			// Ensure a valid (empty) CSV exists so callers can download it
+			fs.writeFileSync(outputPath, "InputAddress,Error\n");
+		} else {
+			const csvWriter = createObjectCsvWriter({
+				path: outputPath,
+				header: Object.keys(results[0]).map((key) => ({ id: key, title: key })),
+			});
+			await csvWriter.writeRecords(results);
+		}
 
 		return c.json({
 			message: "Batch processing complete",
@@ -173,6 +210,11 @@ app.post("/api/upload-csv", async (c) => {
 // ------------------------------
 // Start server
 // ------------------------------
-const PORT = process.env.PORT || 3100;
+const PORT = Number(process.env.PORT) || 3100;
+
+Bun.serve({
+  port: PORT,
+  fetch: app.fetch,
+});
+
 console.log(`📦 Batch lookup tool running at http://localhost:${PORT}`);
-export default app;

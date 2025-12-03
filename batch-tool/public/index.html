@@ -23,7 +23,7 @@
       <button type="submit">Upload and Process</button>
     </form>
 
-    <div id="output"></div>
+    <div id="output" aria-live="polite"></div>
 
     <script>
       document.getElementById("uploadForm").addEventListener("submit", async (e) => {
@@ -31,25 +31,59 @@
         const form = e.target;
         const fileInput = form.querySelector('input[type="file"]');
         const output = document.getElementById("output");
+        const submitBtn = form.querySelector('button[type="submit"]');
+
         if (!fileInput.files.length) return alert("Please choose a CSV file.");
 
         const formData = new FormData();
         formData.append("file", fileInput.files[0]);
 
+        // Disable UI while processing
+        submitBtn.disabled = true;
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = "Processing…";
         output.textContent = "Processing...";
+
         try {
-          const resp = await fetch("/api/upload-csv", { method: "POST", body: formData });
-          const data = await resp.json();
+          // Add a timeout to avoid hanging forever
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
+          const resp = await fetch("./api/upload-csv", { method: "POST", body: formData, signal: controller.signal });
+          clearTimeout(timeoutId);
+
+          let data;
+          try {
+            data = await resp.json();
+          } catch (err) {
+            throw new Error("Invalid JSON response from server");
+          }
+
+          if (!resp.ok) {
+            throw new Error(data?.error || `Server returned ${resp.status}`);
+          }
+
           if (data.download) {
-            output.innerHTML = `
-              ✅ Processed ${data.count} addresses.<br>
-              <a id="downloadLink" href="${data.download}" target="_blank">Download Results CSV</a>
-            `;
+            output.innerHTML = `✅ Processed ${data.count ?? 0} addresses.<br>`;
+            const link = document.createElement('a');
+            link.id = 'downloadLink';
+            link.href = data.download;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = `Download Results CSV (${data.count ?? 0})`;
+            output.appendChild(link);
           } else {
-            output.textContent = "Error: " + (data.error || "Unknown");
+            output.textContent = "Error: " + (data.error || "Unknown error");
           }
         } catch (err) {
-          output.textContent = "Upload failed: " + err.message;
+          if (err.name === 'AbortError') {
+            output.textContent = 'Upload timed out. Please try again.';
+          } else {
+            output.textContent = 'Upload failed: ' + (err.message || String(err));
+          }
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
         }
       });
     </script>
