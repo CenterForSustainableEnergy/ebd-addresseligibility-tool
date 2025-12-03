@@ -12,7 +12,9 @@ import XLSX from "xlsx";
 // --- Load Building Climate Zones by ZIP Code (optional) ---
 let climateZoneByZip = new Map<string, string>();
 try {
-	const climatePath = path.resolve("./data/BuildingClimateZonesByZIPCode_ada.xlsx");
+	const climatePath = path.resolve(
+		"./data/BuildingClimateZonesByZIPCode_ada.xlsx",
+	);
 	if (fs.existsSync(climatePath)) {
 		const climateWorkbook = XLSX.readFile(climatePath);
 		const climateSheet = climateWorkbook.Sheets[climateWorkbook.SheetNames[0]];
@@ -29,19 +31,28 @@ try {
 			]),
 		);
 
-		console.log(`✅ Loaded ${climateZoneByZip.size} ZIP → Climate Zone records.`);
+		console.log(
+			`✅ Loaded ${climateZoneByZip.size} ZIP → Climate Zone records.`,
+		);
 	} else {
-		console.warn(`⚠️ Climate workbook not found at ${climatePath}; ZIP-based climate lookup disabled.`);
+		console.warn(
+			`⚠️ Climate workbook not found at ${climatePath}; ZIP-based climate lookup disabled.`,
+		);
 	}
 } catch (err) {
-	console.warn("⚠️ Failed to load climate workbook; continuing without ZIP-based climate lookup.", err);
+	console.warn(
+		"⚠️ Failed to load climate workbook; continuing without ZIP-based climate lookup.",
+		err,
+	);
 }
 
 // Load environment and validate required credentials
 const SMARTY_AUTH_ID = process.env.SMARTY_AUTH_ID;
 const SMARTY_AUTH_TOKEN = process.env.SMARTY_AUTH_TOKEN;
 if (!SMARTY_AUTH_ID || !SMARTY_AUTH_TOKEN) {
-	console.error("Missing SMARTY_AUTH_ID or SMARTY_AUTH_TOKEN environment variables. Exiting.");
+	console.error(
+		"Missing SMARTY_AUTH_ID or SMARTY_AUTH_TOKEN environment variables. Exiting.",
+	);
 	process.exit(1);
 }
 
@@ -53,17 +64,17 @@ app.use("/results/*", serveStatic({ root: "./data" }));
 
 // Serve main HTML page at "/"
 app.get("/", async (c) => {
-  const filePath = path.join(process.cwd(), "public", "index.html");
-  const html = await fs.promises.readFile(filePath, "utf8");
-  return c.html(html);
+	const filePath = path.join(process.cwd(), "public", "index.html");
+	const html = await fs.promises.readFile(filePath, "utf8");
+	return c.html(html);
 });
 
 // Serve all other static assets (JS, CSS, images)
 app.use(
-  "*",
-  serveStatic({
-    root: path.join(process.cwd(), "public"),
-  })
+	"*",
+	serveStatic({
+		root: path.join(process.cwd(), "public"),
+	}),
 );
 
 // ------------------------------
@@ -213,8 +224,8 @@ app.post("/api/upload-csv", async (c) => {
 const PORT = Number(process.env.PORT) || 3100;
 
 Bun.serve({
-  port: PORT,
-  fetch: app.fetch,
+	port: PORT,
+	fetch: app.fetch,
 });
 
 console.log(`📦 Batch lookup tool running at http://localhost:${PORT}`);
