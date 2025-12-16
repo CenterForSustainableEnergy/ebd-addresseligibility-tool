@@ -35,5 +35,7 @@ Thumbs.db
 backend/data/emails.csv
 
 # under construction
-/batch-tool/node_modules
+# /batch-tool/node_modules
 
+batch-tool/data/batch_results.csv
+batch-tool/data/input.csv
