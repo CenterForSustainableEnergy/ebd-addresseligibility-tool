@@ -141,6 +141,13 @@ app.post("/api/upload-csv", async (c) => {
 
 				const value = arcData?.results?.[0]?.value || {};
 
+				// County (prefer ArcGIS, fallback to Smarty)
+				const county =
+					(typeof value.county === "string" && value.county.trim()) ||
+					(typeof candidate?.metadata?.county_name === "string" &&
+						candidate.metadata.county_name.trim()) ||
+					"";
+
 				// console.log("ArcGIS keys:", Object.keys(value));
 
 				// Extract ZIP from Smarty
@@ -168,8 +175,8 @@ app.post("/api/upload-csv", async (c) => {
 					: false;
 				const carbEligibilityLabel = carbPriorityClean
 					? carbEligible
-						? "Eligible"
-						: "Not Eligible"
+						? "Yes"
+						: "No"
 					: "Unknown";
 
 				// --- Push record ---
@@ -177,6 +184,7 @@ app.post("/api/upload-csv", async (c) => {
 					InputAddress: address,
 					StandardizedAddress: `${candidate.delivery_line_1}, ${candidate.last_line}`,
 					ZipCode: zip,
+					County: county,
 					CensusTract: value.GeoID || "",
 					AssemblyDistrict: value.AssemblyDist || "",
 					SenateDistrict: value.SenateDistrict || "",
