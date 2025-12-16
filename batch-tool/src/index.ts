@@ -59,13 +59,6 @@ if (!SMARTY_AUTH_ID || !SMARTY_AUTH_TOKEN) {
 const app = new Hono();
 app.use("*", cors());
 
-// Serve static results (so callers can download CSV output)
-app.use(
-	"/results/*",
-	serveStatic({
-		root: path.join(process.cwd(), "data"),
-	}),
-);
 
 // Serve main HTML page at "/"
 app.get("/", async (c) => {
@@ -207,29 +200,26 @@ app.post("/api/upload-csv", async (c) => {
 			}
 		}
 
-		// Step 3: Write results to CSV
-		const outputPath = path.join(process.cwd(), "data", "batch_results.csv");
-		if (!results.length) {
-			// Ensure a valid (empty) CSV exists so callers can download it
-			fs.writeFileSync(outputPath, "InputAddress,Error\n");
-		} else {
-			const csvWriter = createObjectCsvWriter({
-				path: outputPath,
-				header: Object.keys(results[0]).map((key) => ({ id: key, title: key })),
-			});
-			await csvWriter.writeRecords(results);
-		}
+		// Build CSV in memory (no file)
+		const csvString = Papa.unparse(results.length ? results : [{ InputAddress: "", Error: "" }]);
 
-		return c.json({
-			message: "Batch processing complete",
-			count: results.length,
-			download: `/results/batch_results.csv`,
+		// Return as CSV file directly
+		return c.body(csvString, 200, {
+		  "Content-Type": "text/csv; charset=utf-8",
+		  "Content-Disposition": 'attachment; filename="batch_results.csv"',
 		});
 	} catch (err) {
 		console.error("Batch CSV upload failed:", err);
 		return c.json({ error: "Batch processing failed" }, 500);
 	}
 });
+
+
+// health check
+app.get("/api/health", (c) => {
+  return c.json({ ok: true, message: "Batch tool is alive" });
+});
+
 
 // ------------------------------
 // Start server

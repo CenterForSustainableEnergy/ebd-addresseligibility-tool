@@ -49,37 +49,62 @@
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 120_000);
 
-          const resp = await fetch("./api/upload-csv", { method: "POST", body: formData, signal: controller.signal });
+          const resp = await fetch("./api/upload-csv", {
+            method: "POST",
+            body: formData,
+            signal: controller.signal,
+          });
           clearTimeout(timeoutId);
 
-          let data;
-          try {
-            data = await resp.json();
-          } catch (err) {
-            throw new Error("Invalid JSON response from server");
-          }
+          const contentType = resp.headers.get("content-type") || "";
 
-          if (!resp.ok) {
-            throw new Error(data?.error || `Server returned ${resp.status}`);
-          }
+          // ✅ Success path: server returned CSV directly
+          if (resp.ok && contentType.includes("text/csv")) {
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
 
-          if (data.download) {
-            output.innerHTML = `✅ Processed ${data.count ?? 0} addresses.<br>`;
-            const link = document.createElement('a');
-            link.id = 'downloadLink';
-            link.href = data.download;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            link.textContent = `Download Results CSV (${data.count ?? 0})`;
+            output.innerHTML = "✅ Batch processing complete. Download your results below:<br>";
+
+            const link = document.createElement("a");
+            link.id = "downloadLink";
+            link.href = url;
+            link.download = "batch_results.csv";
+            link.textContent = "Download Results CSV";
             output.appendChild(link);
-          } else {
-            output.textContent = "Error: " + (data.error || "Unknown error");
+
+            // If you ALSO want to auto-start the download, uncomment:
+            // link.click();
+
+            // Revoke URL after a short delay to avoid memory leaks
+            setTimeout(() => URL.revokeObjectURL(url), 60_000);
+            return;
           }
+
+          // ❌ Error path: try to read JSON/text error details
+          let errorMessage = `Server returned ${resp.status}`;
+          try {
+            const data = await resp.json();
+            if (data && (data.error || data.message)) {
+              errorMessage = data.error || data.message;
+            } else {
+              errorMessage = JSON.stringify(data);
+            }
+          } catch {
+            // Not JSON; fall back to plain text
+            try {
+              const text = await resp.text();
+              if (text) errorMessage = text;
+            } catch {
+              // ignore
+            }
+          }
+
+          throw new Error(errorMessage);
         } catch (err) {
-          if (err.name === 'AbortError') {
-            output.textContent = 'Upload timed out. Please try again.';
+          if (err.name === "AbortError") {
+            output.textContent = "Upload timed out. Please try again.";
           } else {
-            output.textContent = 'Upload failed: ' + (err.message || String(err));
+            output.textContent = "Upload failed: " + (err.message || String(err));
           }
         } finally {
           submitBtn.disabled = false;
