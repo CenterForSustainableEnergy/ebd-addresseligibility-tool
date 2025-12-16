@@ -60,7 +60,12 @@ const app = new Hono();
 app.use("*", cors());
 
 // Serve static results (so callers can download CSV output)
-app.use("/results/*", serveStatic({ root: "./data" }));
+app.use(
+	"/results/*",
+	serveStatic({
+		root: path.join(process.cwd(), "data"),
+	}),
+);
 
 // Serve main HTML page at "/"
 app.get("/", async (c) => {
@@ -143,6 +148,13 @@ app.post("/api/upload-csv", async (c) => {
 
 				const value = arcData?.results?.[0]?.value || {};
 
+				// County (prefer ArcGIS, fallback to Smarty)
+				const county =
+					(typeof value.county === "string" && value.county.trim()) ||
+					(typeof candidate?.metadata?.county_name === "string" &&
+						candidate.metadata.county_name.trim()) ||
+					"";
+
 				// console.log("ArcGIS keys:", Object.keys(value));
 
 				// Extract ZIP from Smarty
@@ -170,8 +182,8 @@ app.post("/api/upload-csv", async (c) => {
 					: false;
 				const carbEligibilityLabel = carbPriorityClean
 					? carbEligible
-						? "Eligible"
-						: "Not Eligible"
+						? "Yes"
+						: "No"
 					: "Unknown";
 
 				// --- Push record ---
@@ -179,6 +191,7 @@ app.post("/api/upload-csv", async (c) => {
 					InputAddress: address,
 					StandardizedAddress: `${candidate.delivery_line_1}, ${candidate.last_line}`,
 					ZipCode: zip,
+					County: county,
 					CensusTract: value.GeoID || "",
 					AssemblyDistrict: value.AssemblyDist || "",
 					SenateDistrict: value.SenateDistrict || "",
@@ -195,7 +208,7 @@ app.post("/api/upload-csv", async (c) => {
 		}
 
 		// Step 3: Write results to CSV
-		const outputPath = path.join("./data", "batch_results.csv");
+		const outputPath = path.join(process.cwd(), "data", "batch_results.csv");
 		if (!results.length) {
 			// Ensure a valid (empty) CSV exists so callers can download it
 			fs.writeFileSync(outputPath, "InputAddress,Error\n");
