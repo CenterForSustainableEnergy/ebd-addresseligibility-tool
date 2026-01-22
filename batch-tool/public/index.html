@@ -6,19 +6,42 @@
     <style>
       body { font-family: Arial, sans-serif; margin: 2rem; background: #fafafa; }
       h1 { color: #1b365d; }
-      form { border: 1px solid #ccc; padding: 1.5rem; border-radius: 8px; background: #fff; width: 450px; }
-      input[type="file"] { margin: 1rem 0; }
+      .tabs { display: flex; gap: 0.5rem; margin-bottom: 0; border-bottom: 2px solid #ccc; }
+      .tab { background: #e0e0e0; border: none; padding: 0.75rem 1.5rem; cursor: pointer; border-radius: 8px 8px 0 0; font-size: 1rem; }
+      .tab.active { background: #fff; border-bottom: 2px solid #fff; margin-bottom: -2px; font-weight: bold; color: #1b365d; }
+      .tab:hover { background: #d0d0d0; }
+      .tab.active:hover { background: #fff; }
+      form { border: 1px solid #ccc; padding: 1.5rem; border-radius: 0 8px 8px 8px; background: #fff; width: 450px; display: none; }
+      form.active { display: block; }
+      input[type="file"], input[type="text"] { margin: 1rem 0; width: 100%; box-sizing: border-box; }
+      input[type="text"] { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
       button { background: #1b365d; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 4px; cursor: pointer; }
       button:hover { background: #2b4c85; }
-      #output { margin-top: 1.5rem; }
+      button:disabled { background: #999; cursor: not-allowed; }
+      #output { margin-top: 1.5rem; max-width: 800px; }
       #downloadLink { display: block; margin-top: 1rem; font-weight: bold; }
+      .results-table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+      .results-table th, .results-table td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+      .results-table th { background: #1b365d; color: white; font-weight: bold; }
+      .results-table tr:nth-child(even) { background: #f9f9f9; }
     </style>
   </head>
   <body>
-    <h1>EBD Batch Address Lookup</h1>
-    <p>Upload a CSV file with a header column named <code>address</code>.</p>
+    <h1>EBD Address Lookup Tool</h1>
+    
+    <div class="tabs">
+      <button class="tab active" data-tab="single">Single Address</button>
+      <button class="tab" data-tab="batch">Batch CSV Upload</button>
+    </div>
+
+    <form id="singleForm" class="active">
+      <p>Enter a single address to look up:</p>
+      <input type="text" id="addressInput" name="address" placeholder="e.g., 1516 9th St, Sacramento, CA 95814" required />
+      <button type="submit">Look Up Address</button>
+    </form>
 
     <form id="uploadForm" enctype="multipart/form-data">
+      <p>Upload a CSV file with a header column named <code>address</code>:</p>
       <input type="file" name="file" accept=".csv" required />
       <button type="submit">Upload and Process</button>
     </form>
@@ -26,6 +49,90 @@
     <div id="output" aria-live="polite"></div>
 
     <script>
+      // Tab switching
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          const targetTab = tab.dataset.tab;
+          
+          // Update active tab
+          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          
+          // Update active form
+          document.querySelectorAll('form').forEach(f => f.classList.remove('active'));
+          if (targetTab === 'single') {
+            document.getElementById('singleForm').classList.add('active');
+          } else {
+            document.getElementById('uploadForm').classList.add('active');
+          }
+          
+          // Clear output
+          document.getElementById('output').innerHTML = '';
+        });
+      });
+
+      // Single address form handler
+      document.getElementById("singleForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const addressInput = form.querySelector('#addressInput');
+        const output = document.getElementById("output");
+        const submitBtn = form.querySelector('button[type="submit"]');
+
+        const address = addressInput.value.trim();
+        if (!address) return alert("Please enter an address.");
+
+        // Disable UI while processing
+        submitBtn.disabled = true;
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = "Looking up…";
+        output.textContent = "Processing...";
+
+        try {
+          const resp = await fetch("./api/lookup-single", { 
+            method: "POST", 
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ address })
+          });
+
+          let data;
+          try {
+            data = await resp.json();
+          } catch (err) {
+            throw new Error("Invalid JSON response from server");
+          }
+
+          if (!resp.ok) {
+            throw new Error(data?.error || `Server returned ${resp.status}`);
+          }
+
+          // Display results in a table
+          output.innerHTML = `<h3>✅ Address Lookup Results</h3>`;
+          const table = document.createElement('table');
+          table.className = 'results-table';
+          
+          const thead = document.createElement('thead');
+          thead.innerHTML = '<tr><th>Field</th><th>Value</th></tr>';
+          table.appendChild(thead);
+          
+          const tbody = document.createElement('tbody');
+          for (const [key, value] of Object.entries(data)) {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td><strong>${key}</strong></td><td>${value || 'N/A'}</td>`;
+            tbody.appendChild(row);
+          }
+          table.appendChild(tbody);
+          output.appendChild(table);
+          
+        } catch (err) {
+          output.textContent = 'Lookup failed: ' + (err.message || String(err));
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
+      });
+
+      // Batch CSV upload form handler
       document.getElementById("uploadForm").addEventListener("submit", async (e) => {
         e.preventDefault();
         const form = e.target;
