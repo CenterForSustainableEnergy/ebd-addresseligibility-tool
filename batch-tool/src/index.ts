@@ -222,6 +222,101 @@ app.get("/api/health", (c) => {
 
 
 // ------------------------------
+// POST /api/lookup-single
+// ------------------------------
+app.post("/api/lookup-single", async (c) => {
+	try {
+		const body = await c.req.json();
+		const address = body.address?.trim();
+
+		if (!address) {
+			return c.json({ error: "No address provided" }, 400);
+		}
+
+		// Step 1: Validate / geocode via Smarty
+		const smartyUrl = `https://us-street.api.smarty.com/street-address?auth-id=${SMARTY_AUTH_ID}&auth-token=${SMARTY_AUTH_TOKEN}&street=${encodeURIComponent(address)}`;
+		const smartyResp = await fetch(smartyUrl);
+		const smartyData = await smartyResp.json();
+
+		if (!smartyData?.length) {
+			return c.json({ error: "Address not found" }, 404);
+		}
+
+		const candidate = smartyData[0];
+		const lat = candidate?.metadata?.latitude;
+		const lon = candidate?.metadata?.longitude;
+
+		if (lat == null || lon == null) {
+			return c.json({ error: "No coordinates returned from Smarty" }, 400);
+		}
+
+		// Step 2: ArcGIS overlay
+		const arcgisUrl = `https://maps3.energycenter.org/arcgis/rest/services/sync/GPServer/LocOverlay_CT/execute?longitude=${lon}&latitude=${lat}&returnZ=false&returnM=false&returnTrueCurves=false&returnFeatureCollection=false&returnColumnName=false&simplifyFeatures=true&context=&f=pjson`;
+		const arcResp = await fetch(arcgisUrl);
+		const arcData = await arcResp.json();
+
+		const value = arcData?.results?.[0]?.value || {};
+
+		// County (prefer ArcGIS, fallback to Smarty)
+		const county =
+			(typeof value.county === "string" && value.county.trim()) ||
+			(typeof candidate?.metadata?.county_name === "string" &&
+				candidate.metadata.county_name.trim()) ||
+			"";
+
+		// Extract ZIP from Smarty
+		const zip = candidate.components?.zipcode || "";
+
+		// Try ArcGIS first, then ZIP-based lookup
+		const arcClimateZone = value.CA_climate_zone || "";
+		const zipClimateZone = zip ? climateZoneByZip.get(zip) || "" : "";
+		const climateZone = arcClimateZone || zipClimateZone || "N/A";
+
+		// --- Normalize CARB Priority Populations field ---
+		const carbPriority = value.carb_priority_pops_4 || "";
+		const carbPriorityClean =
+			typeof carbPriority === "string" ? carbPriority.trim() : "";
+
+		// --- Determine CARB Eligibility ---
+		const ineligibleValues = new Set([
+			"low-income community",
+			"not a priority population area: low-income households are eligible",
+		]);
+
+		const carbNorm = carbPriorityClean.toLowerCase();
+		const carbEligible = carbPriorityClean
+			? !ineligibleValues.has(carbNorm)
+			: false;
+		const carbEligibilityLabel = carbPriorityClean
+			? carbEligible
+				? "Yes"
+				: "No"
+			: "Unknown";
+
+		// Return result
+		const result = {
+			InputAddress: address,
+			StandardizedAddress: `${candidate.delivery_line_1}, ${candidate.last_line}`,
+			ZipCode: zip,
+			County: county,
+			CensusTract: value.GeoID || "",
+			AssemblyDistrict: value.AssemblyDist || "",
+			SenateDistrict: value.SenateDistrict || "",
+			CaliforniaClimateZone: climateZone,
+			DisadvantagedCommunity: value.dac || "",
+			LowIncomeCommunity: value.lic || "",
+			CARB_PriorityPopulation: carbPriorityClean || "N/A",
+			WithinHalfMileOfADisadvantagedCommunity: carbEligibilityLabel,
+		};
+
+		return c.json(result);
+	} catch (err) {
+		console.error("Single address lookup failed:", err);
+		return c.json({ error: "Address lookup failed" }, 500);
+	}
+});
+
+// ------------------------------
 // Start server
 // ------------------------------
 const PORT = Number(process.env.PORT) || 3100;
