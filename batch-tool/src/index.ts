@@ -56,6 +56,30 @@ if (!SMARTY_AUTH_ID || !SMARTY_AUTH_TOKEN) {
 	process.exit(1);
 }
 
+const HALF_MILE_DAC_PREFIX = "dac 1/2 mile neighbor:";
+
+function cleanOverlayLabel(value: unknown): string {
+	if (typeof value !== "string") return "";
+	return value.replace(/^preview\s+for\s+/i, "").trim();
+}
+
+function normalizeOverlayLabel(value: unknown): string {
+	return cleanOverlayLabel(value).toLowerCase();
+}
+
+function getHalfMileDacLabel(
+	disadvantagedCommunityValue: unknown,
+	carbPriorityValue: unknown,
+): string {
+	const dacLabel = normalizeOverlayLabel(disadvantagedCommunityValue);
+	if (dacLabel === "yes" || dacLabel === "true") return "No";
+
+	const carbPriorityLabel = normalizeOverlayLabel(carbPriorityValue);
+	if (!carbPriorityLabel) return "Unknown";
+
+	return carbPriorityLabel.startsWith(HALF_MILE_DAC_PREFIX) ? "Yes" : "No";
+}
+
 const app = new Hono();
 app.use("*", cors());
 
@@ -159,25 +183,9 @@ app.post("/api/upload-csv", async (c) => {
 				const climateZone = arcClimateZone || zipClimateZone || "N/A";
 
 				// --- Normalize CARB Priority Populations field ---
-				const carbPriority = value.carb_priority_pops_4 || "";
-				const carbPriorityClean =
-					typeof carbPriority === "string" ? carbPriority.trim() : "";
-
-				// --- Determine CARB Eligibility ---
-				const ineligibleValues = new Set([
-					"low-income community",
-					"not a priority population area: low-income households are eligible",
-				]);
-
-				const carbNorm = carbPriorityClean.toLowerCase();
-				const carbEligible = carbPriorityClean
-					? !ineligibleValues.has(carbNorm)
-					: false;
-				const carbEligibilityLabel = carbPriorityClean
-					? carbEligible
-						? "Yes"
-						: "No"
-					: "Unknown";
+				const carbPriority = value.carb_priority_pops_4;
+				const carbPriorityClean = cleanOverlayLabel(carbPriority);
+				const halfMileDacLabel = getHalfMileDacLabel(value.dac, carbPriority);
 
 				// --- Push record ---
 				results.push({
@@ -192,7 +200,7 @@ app.post("/api/upload-csv", async (c) => {
 					DisadvantagedCommunity: value.dac || "",
 					LowIncomeCommunity: value.lic || "",
 					CARB_PriorityPopulation: carbPriorityClean || "N/A",
-					WithinHalfMileOfADisadvantagedCommunity: carbEligibilityLabel,
+					WithinHalfMileOfADisadvantagedCommunity: halfMileDacLabel,
 				});
 			} catch (err) {
 				console.error("Error processing address:", address, err);
@@ -273,25 +281,9 @@ app.post("/api/lookup-single", async (c) => {
 		const climateZone = arcClimateZone || zipClimateZone || "N/A";
 
 		// --- Normalize CARB Priority Populations field ---
-		const carbPriority = value.carb_priority_pops_4 || "";
-		const carbPriorityClean =
-			typeof carbPriority === "string" ? carbPriority.trim() : "";
-
-		// --- Determine CARB Eligibility ---
-		const ineligibleValues = new Set([
-			"low-income community",
-			"not a priority population area: low-income households are eligible",
-		]);
-
-		const carbNorm = carbPriorityClean.toLowerCase();
-		const carbEligible = carbPriorityClean
-			? !ineligibleValues.has(carbNorm)
-			: false;
-		const carbEligibilityLabel = carbPriorityClean
-			? carbEligible
-				? "Yes"
-				: "No"
-			: "Unknown";
+		const carbPriority = value.carb_priority_pops_4;
+		const carbPriorityClean = cleanOverlayLabel(carbPriority);
+		const halfMileDacLabel = getHalfMileDacLabel(value.dac, carbPriority);
 
 		// Return result
 		const result = {
@@ -306,7 +298,7 @@ app.post("/api/lookup-single", async (c) => {
 			DisadvantagedCommunity: value.dac || "",
 			LowIncomeCommunity: value.lic || "",
 			CARB_PriorityPopulation: carbPriorityClean || "N/A",
-			WithinHalfMileOfADisadvantagedCommunity: carbEligibilityLabel,
+			WithinHalfMileOfADisadvantagedCommunity: halfMileDacLabel,
 		};
 
 		return c.json(result);
