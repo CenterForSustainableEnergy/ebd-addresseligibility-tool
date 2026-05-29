@@ -71,6 +71,39 @@ const countyIncomeData: CountyIncome[] = Papa.parse<CountyIncome>(
 }));
 
 // -----------------------------------
+// ArcGIS Overlay Label Helpers
+// -----------------------------------
+// ArcGIS overlay values can be prefixed with "preview for "; strip that and
+// normalize so eligibility checks aren't sensitive to whitespace / casing.
+function cleanOverlayLabel(value: unknown): string {
+	if (typeof value !== "string") return "";
+	return value.replace(/^preview\s+for\s+/i, "").trim();
+}
+
+function normalizeOverlayLabel(value: unknown): string {
+	return cleanOverlayLabel(value).toLowerCase();
+}
+
+const HALF_MILE_DAC_PREFIX = "dac 1/2 mile neighbor:";
+
+function isInDac(dacValue: unknown): boolean {
+	const label = normalizeOverlayLabel(dacValue);
+	return label === "yes" || label === "true";
+}
+
+// ArcGIS reports the 1/2-mile DAC case via the CARB priority label, but a true
+// DAC hit should not also be marked as being in the neighboring buffer.
+function isInDacHalfMileBuffer(
+	dacValue: unknown,
+	carbPriorityValue: unknown,
+): boolean {
+	if (isInDac(dacValue)) return false;
+	return normalizeOverlayLabel(carbPriorityValue).startsWith(
+		HALF_MILE_DAC_PREFIX,
+	);
+}
+
+// -----------------------------------
 // Initialize App
 // -----------------------------------
 const app = new Hono();
@@ -194,24 +227,31 @@ app.post("/api/overlay", async (c) => {
 		const tractInfo = tract ? tractData.find((t) => t.tract === tract) : null;
 
 		// -----------------------------------
-		// CARB Priority Population Logic
+		// CARB Priority Population Logic (metadata only)
 		// -----------------------------------
-		function normalizeStr(v?: string): string {
-			if (!v) return "";
-			return v
-				.replace(/^preview\s+for\s+/i, "")
-				.trim()
-				.toLowerCase();
-		}
-
 		const INELIGIBLE_VALUES = new Set<string>([
 			"low-income community",
 			"not a priority population area: low-income households are eligible",
 		]);
 
 		const carbRaw = result?.carb_priority_pops_4 as string | undefined;
-		const carbNorm = normalizeStr(carbRaw);
+		const carbNorm = normalizeOverlayLabel(carbRaw);
 		const isPriority = carbNorm.length > 0 && !INELIGIBLE_VALUES.has(carbNorm);
+
+		// -----------------------------------
+		// DAC Eligibility Logic
+		// -----------------------------------
+		// Per program rule: a home qualifies if its census tract is a DAC, or
+		// if it sits within 1/2 mile of a DAC tract. The 1/2-mile buffer is
+		// reported by ArcGIS via the CARB priority label and is exclusive of
+		// the DAC itself (a DAC hit is not also a "neighbor").
+		const inDac = isInDac(result?.dac);
+		const inDacBuffer = isInDacHalfMileBuffer(
+			result?.dac,
+			result?.carb_priority_pops_4,
+		);
+		const geoEligible = inDac || inDacBuffer;
+		const dacReason = inDac ? "in_dac" : inDacBuffer ? "dac_buffer" : null;
 
 		// -----------------------------------
 		// Lookup County Income Data by ZIP
@@ -285,47 +325,54 @@ app.post("/api/overlay", async (c) => {
 				county_income: countyIncome,
 			});
 
-		// Central region - Not Eligible (link out instead of collecting emails)
-		const eligibleVal = String(tractInfo.eligible).trim().toLowerCase();
-		if (tractInfo.region === "Central" && eligibleVal === "false") {
-			const message = `Looks like your area isn't eligible yet. We're growing! Check back soon or 
-			<a href="https://ebd.energycenter.org/#mk-form" target="_blank" rel="noopener noreferrer">
-				join our mailing list
-			</a> 
-			to stay informed as the program expands to your community.`;
+		// Central region - eligibility is now driven by DAC tract membership or
+		// the 1/2-mile DAC buffer, not by the per-tract `eligible` column.
+		if (tractInfo.region === "Central" && geoEligible) {
+			const message = `
+				It appears that your address may be within the eligible area for this program.
+				Please review the table below to see if your household income also meets the eligibility requirements.
+				<br><br>
+				If your income falls below the listed threshold, you can visit the application portal
+				to complete the next steps for upgrading your home.
+				<br><br>
+				<em>Note:</em> Income limits are current as of April 23, 2025 and may change based on
+				federal or state guidelines.
+				<a href="https://www.hcd.ca.gov/sites/default/files/docs/grants-and-funding/income-limits-2025.pdf"
+					target="_blank" rel="noopener noreferrer">Click here</a>
+				to learn more about income limits.
+`;
 			return c.json({
 				success: true,
-				eligible: false,
+				eligible: true,
 				tract: displayTract,
 				message,
 				region: "Central",
-				action: "visit-signup", // <-- new action
-				signup_url: SIGNUP_URL, // <-- provide link for the UI
+				reason: dacReason, // "in_dac" or "dac_buffer"
 				carb_priority: { is_priority: isPriority, label: carbRaw || "" },
 				county_income: countyIncome,
 			});
 		}
 
-		// Central region - Eligible
-		const message = `
-			It appears that your address may be within the eligible area for this program. 
-			Please review the table below to see if your household income also meets the eligibility requirements.
-			<br><br>
-			If your income falls below the listed threshold, you can visit the application portal 
-			to complete the next steps for upgrading your home.
-			<br><br>
-			<em>Note:</em> Income limits are current as of April 23, 2025 and may change based on 
-			federal or state guidelines. 
-			<a href="https://www.hcd.ca.gov/sites/default/files/docs/grants-and-funding/income-limits-2025.pdf" 
-				target="_blank" rel="noopener noreferrer">Click here</a> 
-			to learn more about income limits.
-`;
+		// Central region - in service area, but not in a DAC and not within
+		// 1/2 mile of one. Note: this is now an address-level determination, so
+		// a neighboring home on the same block may qualify even when this one
+		// does not. Avoid promising the area will "grow" into eligibility.
+		const notEligibleMessage = `
+			This address is within our service area, but it isn't located in a disadvantaged community (DAC)
+			or within 1/2 mile of one, so it doesn't currently qualify for this program. Eligibility is
+			determined at the address level, so a nearby home may still qualify.
+			<a href="${SIGNUP_URL}" target="_blank" rel="noopener noreferrer">Join our mailing list</a>
+			to stay informed about future program updates.
+		`;
 		return c.json({
 			success: true,
-			eligible: true,
+			eligible: false,
 			tract: displayTract,
-			message,
+			message: notEligibleMessage,
 			region: "Central",
+			reason: "central_not_dac",
+			action: "visit-signup",
+			signup_url: SIGNUP_URL,
 			carb_priority: { is_priority: isPriority, label: carbRaw || "" },
 			county_income: countyIncome,
 		});
