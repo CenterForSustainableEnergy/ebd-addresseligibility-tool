@@ -174,20 +174,24 @@ Invoke-WebRequest "https://maps3.energycenter.org/api/validate" -Method OPTIONS 
 9. Test working
 
 ### Modification procedure
-If modifications are needed, you may need to force quite the currently running process. It doesn't always accept End commands from Task Scheduler.
-1. Check to see if a previously started process is listening on port 3000: 
+If modifications are needed, you may need to force quite the currently running process. It doesn't always accept End commands from Task Scheduler. Remember there are two services running. The backend service is listening on Port 3000, the batch-tool service on Port 3001
+1. Check to see if a previously started process is listening on port 3000 or 3001: 
 ```powershell
 netstat -ano | findstr :3000
+netstat -ano | findstr :3001
 ```
 2. Force quit the running process:
 ```powershell
 Stop-Process -Id <PID_FROM_ABOVE> -Force
+Stop-Process -Id <PID_FROM_ABOVE> -Force
 ```
-3. Make changes
+3. Make changes by pulling repo branches or similar. If necessary, rebuilding using `bun run build:widget` or similar.
 4. Restart the service from the Task Scheduler GUI or with
 ```powershell
 schtasks /Run /TN "EBD Address Tool backend"
+schtasks /Run /TN "EBD Address Batch Tool"
 ```
+5. If modified, copy html into relevant inetpub folder.
 
 ## Embedding the Widget on a Website
 
