@@ -49,6 +49,9 @@
     <div id="output" aria-live="polite"></div>
 
     <script>
+      const CLIENT_TIMEOUT_MS = 10 * 60 * 1000;
+      const POLL_INTERVAL_MS = 2000;
+
       // Tab switching
       document.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', () => {
@@ -154,7 +157,7 @@
         try {
           // Add a timeout to avoid hanging forever
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 120_000);
+          const timeoutId = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
 
           const resp = await fetch("./api/upload-csv", {
             method: "POST",
@@ -165,7 +168,7 @@
 
           const contentType = resp.headers.get("content-type") || "";
 
-          // ✅ Success path: server returned CSV directly
+          // ✅ Backward-compat: server returned CSV directly
           if (resp.ok && contentType.includes("text/csv")) {
             const blob = await resp.blob();
             const url = URL.createObjectURL(blob);
@@ -179,34 +182,106 @@
             link.textContent = "Download Results CSV";
             output.appendChild(link);
 
-            // If you ALSO want to auto-start the download, uncomment:
-            // link.click();
-
-            // Revoke URL after a short delay to avoid memory leaks
             setTimeout(() => URL.revokeObjectURL(url), 60_000);
             return;
           }
 
-          // ❌ Error path: try to read JSON/text error details
-          let errorMessage = `Server returned ${resp.status}`;
+          let data;
           try {
-            const data = await resp.json();
-            if (data && (data.error || data.message)) {
-              errorMessage = data.error || data.message;
-            } else {
-              errorMessage = JSON.stringify(data);
-            }
+            data = await resp.json();
           } catch {
-            // Not JSON; fall back to plain text
-            try {
-              const text = await resp.text();
-              if (text) errorMessage = text;
-            } catch {
-              // ignore
-            }
+            data = null;
           }
 
-          throw new Error(errorMessage);
+          if (!resp.ok) {
+            const message = data?.error || data?.message || `Server returned ${resp.status}`;
+            throw new Error(message);
+          }
+
+          const jobId = data?.jobId;
+          if (!jobId) {
+            throw new Error("Missing jobId in server response");
+          }
+
+          output.textContent = "✅ Upload complete. Processing batch...";
+
+          let pollInFlight = false;
+          const pollStatus = async () => {
+            if (pollInFlight) return;
+            pollInFlight = true;
+            try {
+              const statusResp = await fetch(`./api/batch-status/${jobId}`);
+              let statusData;
+              try {
+                statusData = await statusResp.json();
+              } catch {
+                statusData = null;
+              }
+
+              if (!statusResp.ok) {
+                const message =
+                  statusData?.error || statusData?.message || `Server returned ${statusResp.status}`;
+                throw new Error(message);
+              }
+
+              if (statusData?.status === "failed") {
+                clearInterval(intervalId);
+                output.textContent =
+                  "Batch failed: " + (statusData?.error || "Unknown error");
+                return;
+              }
+
+              if (statusData?.status === "completed") {
+                clearInterval(intervalId);
+                output.textContent = "✅ Batch complete. Preparing download...";
+
+                const resultUrl = statusData?.downloadUrl || `./api/batch-results/${jobId}`;
+                const resultResp = await fetch(resultUrl);
+                const resultType = resultResp.headers.get("content-type") || "";
+
+                if (!resultResp.ok) {
+                  throw new Error(`Server returned ${resultResp.status}`);
+                }
+
+                if (!resultType.includes("text/csv")) {
+                  throw new Error("Unexpected response when downloading results");
+                }
+
+                const blob = await resultResp.blob();
+                const url = URL.createObjectURL(blob);
+
+                output.innerHTML =
+                  "✅ Batch processing complete. Download your results below:<br>";
+
+                const link = document.createElement("a");
+                link.id = "downloadLink";
+                link.href = url;
+                link.download = "batch_results.csv";
+                link.textContent = "Download Results CSV";
+                output.appendChild(link);
+
+                setTimeout(() => URL.revokeObjectURL(url), 60_000);
+                return;
+              }
+
+              const processed = Number(statusData?.processed ?? 0);
+              const total = Number(statusData?.total ?? 0);
+              const errors = Number(statusData?.errors ?? 0);
+              if (total > 0) {
+                output.textContent = `Processing... ${processed}/${total} (errors: ${errors})`;
+              } else {
+                output.textContent = `Processing... ${processed} processed`;
+              }
+            } catch (err) {
+              clearInterval(intervalId);
+              output.textContent = "Status check failed: " + (err.message || String(err));
+            } finally {
+              pollInFlight = false;
+            }
+          };
+
+          const intervalId = setInterval(pollStatus, POLL_INTERVAL_MS);
+          await pollStatus();
         } catch (err) {
           if (err.name === "AbortError") {
             output.textContent = "Upload timed out. Please try again.";
