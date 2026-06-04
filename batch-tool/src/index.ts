@@ -182,7 +182,11 @@ function getJob(id: string) {
 async function lookupAddress(address: string): Promise<LookupResult> {
 	try {
 		// Step 1: Validate / geocode via Smarty
-		const smartyUrl = `https://us-street.api.smarty.com/street-address?auth-id=${SMARTY_AUTH_ID}&auth-token=${SMARTY_AUTH_TOKEN}&street=${encodeURIComponent(address)}`;
+		// `match=enhanced` lets Smarty geocode valid physical locations that
+		// aren't USPS-deliverable (e.g. rural addresses like New Cuyama).
+		// Without it Smarty defaults to strict mode and returns [] for these,
+		// reporting a false "Address not found".
+		const smartyUrl = `https://us-street.api.smarty.com/street-address?auth-id=${SMARTY_AUTH_ID}&auth-token=${SMARTY_AUTH_TOKEN}&match=enhanced&street=${encodeURIComponent(address)}`;
 		const smartyResp = await fetch(smartyUrl);
 		const smartyData = await smartyResp.json();
 

@@ -163,7 +163,7 @@ app.post("/api/validate", limiter, async (c) => {
 		const url =
 			`https://us-street.api.smarty.com/street-address?` +
 			`auth-id=${SMARTY_AUTH_ID}&auth-token=${SMARTY_AUTH_TOKEN}` +
-			`&street=${encodeURIComponent(address)}`;
+			`&match=enhanced&street=${encodeURIComponent(address)}`;
 
 		const smartyResp = await fetch(url);
 		const smartyData = await smartyResp.json();
