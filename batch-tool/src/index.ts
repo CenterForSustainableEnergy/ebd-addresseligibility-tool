@@ -23,7 +23,10 @@ try {
 		});
 		for (const row of data) {
 			const cfa = row.CFA?.trim();
-			if (cfa) cfaByTract.set(String(row.tract).trim(), cfa);
+			// tracts.csv stores tracts without the leading zero (e.g. 6019000600)
+			// while ArcGIS GeoID includes it (06019000600); pad to 11 digits so
+			// the two formats line up. Mirrors the backend's normalization.
+			if (cfa) cfaByTract.set(String(row.tract).trim().padStart(11, "0"), cfa);
 		}
 		console.log(`✅ Loaded ${cfaByTract.size} tract → CFA records.`);
 	} else {
@@ -308,7 +311,12 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 			LowIncomeCommunity: value.lic || "",
 			CARB_PriorityPopulation: carbPriorityClean || "N/A",
 			WithinHalfMileOfADisadvantagedCommunity: halfMileDacLabel,
-			CFA: cfaByTract.get(value.GeoID) || NOT_IN_ICFA,
+			CFA:
+				cfaByTract.get(
+					String(value.GeoID ?? "")
+						.trim()
+						.padStart(11, "0"),
+				) || NOT_IN_ICFA,
 		};
 
 		return { ok: true, data: result };
