@@ -10,6 +10,34 @@ import Papa from "papaparse";
 
 import XLSX from "xlsx";
 
+// --- Load CFA tract lookup (tract ID → CFA label) ---
+const NOT_IN_ICFA = "Not in current ICFA";
+const cfaByTract = new Map<string, string>();
+try {
+	const tractPath = path.resolve("./data/tracts.csv");
+	if (fs.existsSync(tractPath)) {
+		const tractCsv = fs.readFileSync(tractPath, "utf-8");
+		const { data } = Papa.parse<{ tract: string; CFA: string }>(tractCsv, {
+			header: true,
+			skipEmptyLines: true,
+		});
+		for (const row of data) {
+			const cfa = row.CFA?.trim();
+			if (cfa) cfaByTract.set(String(row.tract).trim(), cfa);
+		}
+		console.log(`✅ Loaded ${cfaByTract.size} tract → CFA records.`);
+	} else {
+		console.warn(
+			`⚠️ tracts.csv not found at ${tractPath}; CFA lookup disabled.`,
+		);
+	}
+} catch (err) {
+	console.warn(
+		"⚠️ Failed to load tracts.csv; continuing without CFA lookup.",
+		err,
+	);
+}
+
 // --- Load Building Climate Zones by ZIP Code (optional) ---
 let climateZoneByZip = new Map<string, string>();
 try {
@@ -123,6 +151,7 @@ type AddressResult = {
 	LowIncomeCommunity: string;
 	CARB_PriorityPopulation: string;
 	WithinHalfMileOfADisadvantagedCommunity: string;
+	CFA: string;
 };
 
 type BatchRowResult =
@@ -246,6 +275,7 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 			LowIncomeCommunity: value.lic || "",
 			CARB_PriorityPopulation: carbPriorityClean || "N/A",
 			WithinHalfMileOfADisadvantagedCommunity: halfMileDacLabel,
+			CFA: cfaByTract.get(value.GeoID) || NOT_IN_ICFA,
 		};
 
 		return { ok: true, data: result };
