@@ -13,6 +13,16 @@ import XLSX from "xlsx";
 // --- Load CFA tract lookup (tract ID → CFA label) ---
 const NOT_IN_ICFA = "Not in current ICFA";
 const cfaByTract = new Map<string, string>();
+
+// tracts.csv CFA values carry long descriptions, e.g.
+// "Bakersfield (PG&E zonal gas decommissioning area)" or
+// "Imperial Valley - Salton Sea, El Centro, Brawley". Reduce to the leading
+// place name by trimming at the first "(", ",", ":", or " - " separator.
+function shortenCfa(label: string): string {
+	const match = label.match(/[(,:]|\s+-\s+/);
+	const short = match ? label.slice(0, match.index) : label;
+	return short.trim();
+}
 try {
 	const tractPath = path.resolve("./data/tracts.csv");
 	if (fs.existsSync(tractPath)) {
@@ -26,7 +36,11 @@ try {
 			// tracts.csv stores tracts without the leading zero (e.g. 6019000600)
 			// while ArcGIS GeoID includes it (06019000600); pad to 11 digits so
 			// the two formats line up. Mirrors the backend's normalization.
-			if (cfa) cfaByTract.set(String(row.tract).trim().padStart(11, "0"), cfa);
+			if (cfa)
+				cfaByTract.set(
+					String(row.tract).trim().padStart(11, "0"),
+					shortenCfa(cfa),
+				);
 		}
 		console.log(`✅ Loaded ${cfaByTract.size} tract → CFA records.`);
 	} else {
@@ -154,7 +168,7 @@ type AddressResult = {
 	LowIncomeCommunity: string;
 	CARB_PriorityPopulation: string;
 	WithinHalfMileOfADisadvantagedCommunity: string;
-	CFA: string;
+	"Potential CFA": string;
 };
 
 type BatchRowResult =
@@ -311,7 +325,7 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 			LowIncomeCommunity: value.lic || "",
 			CARB_PriorityPopulation: carbPriorityClean || "N/A",
 			WithinHalfMileOfADisadvantagedCommunity: halfMileDacLabel,
-			CFA:
+			"Potential CFA":
 				cfaByTract.get(
 					String(value.GeoID ?? "")
 						.trim()
@@ -430,7 +444,7 @@ async function processBatchFile(job: BatchJob, file: File) {
 		"LowIncomeCommunity",
 		"CARB_PriorityPopulation",
 		"WithinHalfMileOfADisadvantagedCommunity",
-		"CFA",
+		"Potential CFA",
 		"Error",
 	];
 	job.csv = Papa.unparse(
