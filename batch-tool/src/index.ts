@@ -319,15 +319,20 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 		const carbPriorityClean = cleanOverlayLabel(carbPriority);
 		const halfMileDacLabel = getHalfMileDacLabel(value.dac, carbPriority);
 
+		// Census tract: use the 2020 vintage, which is what tracts.csv is keyed
+		// on (and what the backend uses). The overlay also returns GeoID/tract,
+		// but those are an older vintage and differ for tracts that were
+		// renumbered in the 2020 census (e.g. 06019000600 vs 06019000602).
+		const censusTract = String(value.ca_census_tracts_2020 ?? "").trim();
+
 		// --- Potential CFA lookup ---
 		// Three cases: tract has a CFA, tract is listed without one
 		// (NOT_IN_ICFA), or the tract isn't in tracts.csv at all
-		// (NOT_IN_TRACT_LIST). An empty GeoID means ArcGIS returned no tract, so
+		// (NOT_IN_TRACT_LIST). An empty tract means ArcGIS returned none, so
 		// keep the existing NOT_IN_ICFA fallback there.
-		const geoId = String(value.GeoID ?? "").trim();
-		const paddedTract = geoId.padStart(11, "0");
+		const paddedTract = censusTract.padStart(11, "0");
 		let potentialCfa: string;
-		if (geoId && !knownTracts.has(paddedTract)) {
+		if (censusTract && !knownTracts.has(paddedTract)) {
 			potentialCfa = NOT_IN_TRACT_LIST;
 		} else {
 			potentialCfa = cfaByTract.get(paddedTract) || NOT_IN_ICFA;
@@ -338,7 +343,7 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 			StandardizedAddress: `${candidate.delivery_line_1}, ${candidate.last_line}`,
 			ZipCode: zip,
 			County: county,
-			CensusTract: value.GeoID || "",
+			CensusTract: censusTract,
 			AssemblyDistrict: value.AssemblyDist || "",
 			SenateDistrict: value.SenateDistrict || "",
 			CaliforniaClimateZone: climateZone,
