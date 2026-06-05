@@ -12,7 +12,12 @@ import XLSX from "xlsx";
 
 // --- Load CFA tract lookup (tract ID → CFA label) ---
 const NOT_IN_ICFA = "Not in current ICFA";
+const NOT_IN_TRACT_LIST = "Not in Census Tract List. Contact CSE for update.";
 const cfaByTract = new Map<string, string>();
+// Every tract present in tracts.csv, regardless of whether it has a CFA value.
+// Lets us tell "tract is listed but has no CFA" (NOT_IN_ICFA) apart from
+// "tract isn't in our list at all" (NOT_IN_TRACT_LIST).
+const knownTracts = new Set<string>();
 
 // tracts.csv CFA values carry long descriptions, e.g.
 // "Bakersfield (PG&E zonal gas decommissioning area)" or
@@ -32,17 +37,19 @@ try {
 			skipEmptyLines: true,
 		});
 		for (const row of data) {
-			const cfa = row.CFA?.trim();
+			const tractRaw = String(row.tract ?? "").trim();
+			if (!tractRaw) continue;
 			// tracts.csv stores tracts without the leading zero (e.g. 6019000600)
 			// while ArcGIS GeoID includes it (06019000600); pad to 11 digits so
 			// the two formats line up. Mirrors the backend's normalization.
-			if (cfa)
-				cfaByTract.set(
-					String(row.tract).trim().padStart(11, "0"),
-					shortenCfa(cfa),
-				);
+			const tract = tractRaw.padStart(11, "0");
+			knownTracts.add(tract);
+			const cfa = row.CFA?.trim();
+			if (cfa) cfaByTract.set(tract, shortenCfa(cfa));
 		}
-		console.log(`✅ Loaded ${cfaByTract.size} tract → CFA records.`);
+		console.log(
+			`✅ Loaded ${knownTracts.size} tracts (${cfaByTract.size} with CFA).`,
+		);
 	} else {
 		console.warn(
 			`⚠️ tracts.csv not found at ${tractPath}; CFA lookup disabled.`,
@@ -312,6 +319,20 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 		const carbPriorityClean = cleanOverlayLabel(carbPriority);
 		const halfMileDacLabel = getHalfMileDacLabel(value.dac, carbPriority);
 
+		// --- Potential CFA lookup ---
+		// Three cases: tract has a CFA, tract is listed without one
+		// (NOT_IN_ICFA), or the tract isn't in tracts.csv at all
+		// (NOT_IN_TRACT_LIST). An empty GeoID means ArcGIS returned no tract, so
+		// keep the existing NOT_IN_ICFA fallback there.
+		const geoId = String(value.GeoID ?? "").trim();
+		const paddedTract = geoId.padStart(11, "0");
+		let potentialCfa: string;
+		if (geoId && !knownTracts.has(paddedTract)) {
+			potentialCfa = NOT_IN_TRACT_LIST;
+		} else {
+			potentialCfa = cfaByTract.get(paddedTract) || NOT_IN_ICFA;
+		}
+
 		const result: AddressResult = {
 			InputAddress: address,
 			StandardizedAddress: `${candidate.delivery_line_1}, ${candidate.last_line}`,
@@ -325,12 +346,7 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 			LowIncomeCommunity: value.lic || "",
 			CARB_PriorityPopulation: carbPriorityClean || "N/A",
 			WithinHalfMileOfADisadvantagedCommunity: halfMileDacLabel,
-			"Potential CFA":
-				cfaByTract.get(
-					String(value.GeoID ?? "")
-						.trim()
-						.padStart(11, "0"),
-				) || NOT_IN_ICFA,
+			"Potential CFA": potentialCfa,
 		};
 
 		return { ok: true, data: result };
