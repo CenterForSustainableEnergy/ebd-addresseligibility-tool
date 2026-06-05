@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+﻿import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -210,14 +210,20 @@ function getJob(id: string) {
 
 async function lookupAddress(address: string): Promise<LookupResult> {
 	try {
-		// Step 1: Validate / geocode via Smarty
-		// `match=enhanced` lets Smarty geocode valid physical locations that
-		// aren't USPS-deliverable (e.g. rural addresses like New Cuyama).
-		// Without it Smarty defaults to strict mode and returns [] for these,
-		// reporting a false "Address not found".
-		const smartyUrl = `https://us-street.api.smarty.com/street-address?auth-id=${SMARTY_AUTH_ID}&auth-token=${SMARTY_AUTH_TOKEN}&match=enhanced&street=${encodeURIComponent(address)}`;
-		const smartyResp = await fetch(smartyUrl);
-		const smartyData = await smartyResp.json();
+		// Step 1: Validate / geocode via Smarty.
+		// Try match=enhanced first (accepts non-USPS-deliverable physical locations).
+		// Fall back to match=invalid if enhanced returns nothing — this corrects
+		// minor street-name misspellings at the cost of accepting looser matches.
+		const smartyBase = `https://us-street.api.smarty.com/street-address?auth-id=${SMARTY_AUTH_ID}&auth-token=${SMARTY_AUTH_TOKEN}&street=${encodeURIComponent(address)}`;
+		let smartyData = await fetch(`${smartyBase}&match=enhanced`).then((r) =>
+			r.json(),
+		);
+
+		if (!smartyData?.length) {
+			smartyData = await fetch(`${smartyBase}&match=invalid`).then((r) =>
+				r.json(),
+			);
+		}
 
 		if (!smartyData?.length) {
 			return { ok: false, error: "Address not found", status: 404 };
@@ -374,8 +380,24 @@ async function processBatchFile(job: BatchJob, file: File) {
 		return;
 	}
 
+	const ALL_FIELDS: string[] = [
+		"InputAddress",
+		"StandardizedAddress",
+		"ZipCode",
+		"County",
+		"CensusTract",
+		"AssemblyDistrict",
+		"SenateDistrict",
+		"CaliforniaClimateZone",
+		"DisadvantagedCommunity",
+		"LowIncomeCommunity",
+		"CARB_PriorityPopulation",
+		"WithinHalfMileOfADisadvantagedCommunity",
+		"Error",
+	];
 	job.csv = Papa.unparse(
 		job.results.length ? job.results : [{ InputAddress: "", Error: "" }],
+		{ columns: ALL_FIELDS },
 	);
 	job.results = [];
 	job.status = "completed";
