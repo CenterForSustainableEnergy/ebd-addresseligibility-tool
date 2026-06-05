@@ -1,3 +1,5 @@
 # Ignore build outputs and dependencies
 frontend/dist/
 node_modules/
+# Git worktrees carry their own nested biome.json which trip the lint hook
+.worktrees/

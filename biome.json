@@ -7,7 +7,11 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"experimentalScannerIgnores": ["frontend/dist/", "node_modules/"]
+		"experimentalScannerIgnores": [
+			"frontend/dist/",
+			"node_modules/",
+			".worktrees/"
+		]
 	},
 	"formatter": {
 		"enabled": true,
