@@ -393,6 +393,7 @@ async function processBatchFile(job: BatchJob, file: File) {
 		"LowIncomeCommunity",
 		"CARB_PriorityPopulation",
 		"WithinHalfMileOfADisadvantagedCommunity",
+		"CFA",
 		"Error",
 	];
 	job.csv = Papa.unparse(
@@ -413,14 +414,6 @@ app.get("/", async (c) => {
 	const html = await fs.promises.readFile(filePath, "utf8");
 	return c.html(html);
 });
-
-// Serve all other static assets (JS, CSS, images)
-app.use(
-	"*",
-	serveStatic({
-		root: path.join(process.cwd(), "public"),
-	}),
-);
 
 // ------------------------------
 // POST /api/upload-csv
@@ -536,6 +529,14 @@ app.post("/api/lookup-single", async (c) => {
 		return c.json({ error: "Address lookup failed" }, 500);
 	}
 });
+
+// Serve static assets last so API routes always take priority
+app.use(
+	"*",
+	serveStatic({
+		root: path.join(process.cwd(), "public"),
+	}),
+);
 
 // ------------------------------
 // Start server
