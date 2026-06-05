@@ -1,4 +1,4 @@
-import "dotenv/config";
+﻿import "dotenv/config";
 import fs from "node:fs";
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
@@ -213,6 +213,7 @@ app.post("/api/overlay", async (c) => {
 		}
 
 		const arcData = JSON.parse(jsonMatch[0]);
+		// biome-ignore lint/suspicious/noExplicitAny: ArcGIS overlay response is dynamically shaped
 		let result: any = {};
 		if (arcData?.results?.[0]?.value) result = arcData.results[0].value;
 
@@ -222,8 +223,7 @@ app.post("/api/overlay", async (c) => {
 		// --- Census tract extraction ---
 		const tractRaw = result?.ca_census_tracts_2020;
 		const tract = tractRaw ? tractRaw.toString().padStart(11, "0") : null;
-		const displayTract =
-			tract && tract.startsWith("0") ? tract.slice(1) : tract;
+		const displayTract = tract?.startsWith("0") ? tract.slice(1) : tract;
 		const tractInfo = tract ? tractData.find((t) => t.tract === tract) : null;
 
 		// -----------------------------------
@@ -353,17 +353,12 @@ app.post("/api/overlay", async (c) => {
 			});
 		}
 
-		// Central region - in service area, but not in a DAC and not within
-		// 1/2 mile of one. Note: this is now an address-level determination, so
-		// a neighboring home on the same block may qualify even when this one
-		// does not. Avoid promising the area will "grow" into eligibility.
-		const notEligibleMessage = `
-			This address is within our service area, but it isn't located in a disadvantaged community (DAC)
-			or within 1/2 mile of one, so it doesn't currently qualify for this program. Eligibility is
-			determined at the address level, so a nearby home may still qualify.
-			<a href="${SIGNUP_URL}" target="_blank" rel="noopener noreferrer">Join our mailing list</a>
-			to stay informed about future program updates.
-		`;
+		// Central region - in service area but not in a DAC and not within
+		// 1/2 mile of one, so not currently eligible. Uses the default
+		// "program is growing" message.
+		const notEligibleMessage = `Looks like your area isn't eligible yet. We're growing! Check back soon or
+			<a href="${SIGNUP_URL}" target="_blank" rel="noopener noreferrer">join our mailing list</a>
+			to stay informed as the program expands to your community.`;
 		return c.json({
 			success: true,
 			eligible: false,
