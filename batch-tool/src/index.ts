@@ -542,8 +542,11 @@ app.get("/api/batch-status/:id", (c) => {
 		processed: job.processed,
 		errors: job.errors,
 		error: job.errorMessage,
+		// Relative URL so it resolves under the app's base path (e.g. behind an
+		// IIS sub-path reverse proxy). An absolute "/api/..." would hit the site
+		// root, which proxies to a different service.
 		downloadUrl:
-			job.status === "completed" ? `/api/batch-results/${job.id}` : undefined,
+			job.status === "completed" ? `./api/batch-results/${job.id}` : undefined,
 	});
 });
 
