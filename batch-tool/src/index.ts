@@ -356,7 +356,8 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 
 		return { ok: true, data: result };
 	} catch (err) {
-		console.error("Address lookup failed:", address, err);
+		// Do not log the address (PII).
+		console.error("Address lookup failed:", err);
 		return { ok: false, error: "Address lookup failed", status: 500 };
 	}
 }
@@ -407,7 +408,8 @@ async function processBatchFile(job: BatchJob, file: File) {
 						}
 					})
 					.catch((err) => {
-						console.error("Error processing address:", address, err);
+						// Do not log the address (PII).
+						console.error("Error processing an address:", err);
 						job.errors += 1;
 						job.results.push({
 							InputAddress: address,
