@@ -21,6 +21,7 @@ interface TractInfo {
 	tract: string;
 	region: string;
 	eligible: string; // "true"/"false"
+	CFA: string; // CFA label; empty when the tract is not a CFA
 }
 
 const tractData: TractInfo[] = Papa.parse<TractInfo>(
@@ -325,9 +326,12 @@ app.post("/api/overlay", async (c) => {
 				county_income: countyIncome,
 			});
 
-		// Central region - eligibility is now driven by DAC tract membership or
-		// the 1/2-mile DAC buffer, not by the per-tract `eligible` column.
-		if (tractInfo.region === "Central" && geoEligible) {
+		// Central region - eligibility requires the tract to be a CFA (the `CFA`
+		// column is populated in tracts.csv) AND to meet the DAC tract membership
+		// or 1/2-mile DAC buffer rule. Tracts that aren't CFAs are not eligible
+		// regardless of DAC status.
+		const isCfa = Boolean(tractInfo.CFA?.trim());
+		if (tractInfo.region === "Central" && isCfa && geoEligible) {
 			const message = `
 				It appears that your address may be within the eligible area for this program.
 				Please review the table below to see if your household income also meets the eligibility requirements.
@@ -353,9 +357,10 @@ app.post("/api/overlay", async (c) => {
 			});
 		}
 
-		// Central region - in service area but not in a DAC and not within
-		// 1/2 mile of one, so not currently eligible. Uses the default
-		// "program is growing" message.
+		// Central region - in the service area but not currently eligible, either
+		// because the tract isn't a CFA (`central_not_cfa`) or because it is a CFA
+		// but isn't a DAC / within 1/2 mile of one (`central_not_dac`). Both use
+		// the default "program is growing" message.
 		const notEligibleMessage = `Looks like your area isn't eligible yet. We're growing! Check back soon or
 			<a href="${SIGNUP_URL}" target="_blank" rel="noopener noreferrer">join our mailing list</a>
 			to stay informed as the program expands to your community.`;
@@ -365,7 +370,7 @@ app.post("/api/overlay", async (c) => {
 			tract: displayTract,
 			message: notEligibleMessage,
 			region: "Central",
-			reason: "central_not_dac",
+			reason: isCfa ? "central_not_dac" : "central_not_cfa",
 			action: "visit-signup",
 			signup_url: SIGNUP_URL,
 			carb_priority: { is_priority: isPriority, label: carbRaw || "" },
