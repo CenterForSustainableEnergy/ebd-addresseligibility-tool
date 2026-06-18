@@ -36,12 +36,13 @@ PORT=8282
 
 Optional tuning variables (all have sensible defaults):
 
-| Variable                 | Default     | Purpose                                            |
-| ------------------------ | ----------- | -------------------------------------------------- |
-| `PORT`                   | `3100`      | HTTP listen port                                   |
-| `BATCH_CONCURRENCY`      | `3`         | Max addresses geocoded in parallel per job         |
-| `MAX_REQUEST_BODY_SIZE`  | `256 MiB`   | Upload size limit (bytes)                          |
-| `JOB_TTL_MS`             | `1800000`   | How long a finished job's results stay in memory   |
+| Variable                 | Default     | Purpose                                                    |
+| ------------------------ | ----------- | ---------------------------------------------------------- |
+| `PORT`                   | `3100`      | HTTP listen port                                           |
+| `BATCH_CONCURRENCY`      | `3`         | Max addresses geocoded in parallel per job                 |
+| `MAX_ACTIVE_JOBS`        | `3`         | Max concurrent batch jobs; returns 429 when exceeded       |
+| `MAX_REQUEST_BODY_SIZE`  | `256 MiB`   | Upload size limit (bytes)                                  |
+| `JOB_TTL_MS`             | `1800000`   | How long a finished job's results stay in memory           |
 
 Run:
 

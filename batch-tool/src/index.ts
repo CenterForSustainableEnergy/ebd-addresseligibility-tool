@@ -135,6 +135,19 @@ const BATCH_CONCURRENCY = (() => {
 		: DEFAULT_BATCH_CONCURRENCY;
 })();
 
+// Maximum number of batch jobs that may be actively processing at once.
+// Additional uploads are rejected with 429 until a slot opens.
+const DEFAULT_MAX_ACTIVE_JOBS = 3;
+const MAX_ACTIVE_JOBS = (() => {
+	const raw = process.env.MAX_ACTIVE_JOBS;
+	const parsed = raw ? Number(raw) : Number.NaN;
+	return Number.isFinite(parsed) && parsed > 0
+		? Math.floor(parsed)
+		: DEFAULT_MAX_ACTIVE_JOBS;
+})();
+
+let activeJobCount = 0;
+
 const DEFAULT_JOB_TTL_MS = 30 * 60 * 1000;
 const JOB_TTL_MS = (() => {
 	const raw = process.env.JOB_TTL_MS;
@@ -407,6 +420,16 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 		return { ok: true, data: result };
 	} catch (err) {
 		if (err instanceof Error && err.name === "TimeoutError") {
+			// One automatic retry after a short pause — recovers most transient
+			// Smarty hangs without masking genuine rate-limit exhaustion.
+			await new Promise<void>((resolve) => {
+				setTimeout(resolve, 2_000);
+			});
+			try {
+				return await lookupAddress(address);
+			} catch {
+				// Retry also timed out; give up with an actionable message.
+			}
 			return {
 				ok: false,
 				error:
@@ -650,6 +673,13 @@ app.post("/api/upload-csv", async (c) => {
 			return c.json({ error: "No CSV file uploaded" }, 400);
 		}
 
+		if (activeJobCount >= MAX_ACTIVE_JOBS) {
+			return c.json(
+				{ error: "Server busy — too many batches running, try again shortly" },
+				429,
+			);
+		}
+
 		const jobId = randomUUID();
 		const job: BatchJob = {
 			id: jobId,
@@ -661,13 +691,18 @@ app.post("/api/upload-csv", async (c) => {
 			results: [],
 		};
 		jobs.set(jobId, job);
+		activeJobCount += 1;
 
-		void processBatchFile(job, file).catch((err) => {
-			console.error("Batch processing failed:", err);
-			job.status = "failed";
-			job.errorMessage = "Batch processing failed";
-			job.finishedAt = Date.now();
-		});
+		void processBatchFile(job, file)
+			.catch((err) => {
+				console.error("Batch processing failed:", err);
+				job.status = "failed";
+				job.errorMessage = "Batch processing failed";
+				job.finishedAt = Date.now();
+			})
+			.finally(() => {
+				activeJobCount -= 1;
+			});
 
 		return c.json({ jobId }, 202);
 	} catch (err) {
