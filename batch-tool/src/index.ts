@@ -118,6 +118,8 @@ const MAX_REQUEST_BODY_SIZE = (() => {
 		: DEFAULT_MAX_REQUEST_BODY_SIZE;
 })();
 
+const FETCH_TIMEOUT_MS = 10_000;
+
 const DEFAULT_BATCH_CONCURRENCY = 3;
 const BATCH_CONCURRENCY = (() => {
 	const raw = process.env.BATCH_CONCURRENCY;
@@ -200,7 +202,7 @@ type BatchJob = {
 	errorMessage?: string;
 };
 
-type LookupErrorStatus = 400 | 404 | 500;
+type LookupErrorStatus = 400 | 404 | 429 | 500;
 
 type LookupResult =
 	| { ok: true; data: AddressResult }
@@ -262,18 +264,57 @@ function getJob(id: string) {
 async function lookupAddress(address: string): Promise<LookupResult> {
 	try {
 		// Step 1: Validate / geocode via Smarty.
+		// Credentials go in the Authorization header to keep them out of access logs.
 		// Try match=enhanced first (accepts non-USPS-deliverable physical locations).
-		// Fall back to match=invalid if enhanced returns nothing — this corrects
-		// minor street-name misspellings at the cost of accepting looser matches.
-		const smartyBase = `https://us-street.api.smarty.com/street-address?auth-id=${SMARTY_AUTH_ID}&auth-token=${SMARTY_AUTH_TOKEN}&street=${encodeURIComponent(address)}`;
-		let smartyData = await fetch(`${smartyBase}&match=enhanced`).then((r) =>
-			r.json(),
-		);
+		// Fall back to match=invalid only on a successful 200 with no candidates —
+		// this corrects minor misspellings without retrying on rate-limit errors.
+		const smartyUrl = (match: string) =>
+			`https://us-street.api.smarty.com/street-address?street=${encodeURIComponent(address)}&match=${match}`;
+		const smartyHeaders = {
+			Authorization: `Smarty key=${SMARTY_AUTH_ID}:${SMARTY_AUTH_TOKEN}`,
+		};
+		const smartyOpts = {
+			headers: smartyHeaders,
+			signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+		};
+
+		let smartyResp = await fetch(smartyUrl("enhanced"), smartyOpts);
+		if (smartyResp.status === 429) {
+			return {
+				ok: false,
+				error:
+					"Smarty rate limit exceeded — reduce batch size or wait before retrying",
+				status: 429,
+			};
+		}
+		if (!smartyResp.ok) {
+			return {
+				ok: false,
+				error: `Smarty error ${smartyResp.status}`,
+				status: 500,
+			};
+		}
+		let smartyData = await smartyResp.json();
 
 		if (!smartyData?.length) {
-			smartyData = await fetch(`${smartyBase}&match=invalid`).then((r) =>
-				r.json(),
-			);
+			// Only fall back when enhanced returned 200 with no candidates.
+			smartyResp = await fetch(smartyUrl("invalid"), smartyOpts);
+			if (smartyResp.status === 429) {
+				return {
+					ok: false,
+					error:
+						"Smarty rate limit exceeded — reduce batch size or wait before retrying",
+					status: 429,
+				};
+			}
+			if (!smartyResp.ok) {
+				return {
+					ok: false,
+					error: `Smarty error ${smartyResp.status}`,
+					status: 500,
+				};
+			}
+			smartyData = await smartyResp.json();
 		}
 
 		if (!smartyData?.length) {
@@ -294,7 +335,16 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 
 		// Step 2: ArcGIS overlay
 		const arcgisUrl = `https://maps3.energycenter.org/arcgis/rest/services/sync/GPServer/LocOverlay_CT/execute?longitude=${lon}&latitude=${lat}&returnZ=false&returnM=false&returnTrueCurves=false&returnFeatureCollection=false&returnColumnName=false&simplifyFeatures=true&context=&f=pjson`;
-		const arcResp = await fetch(arcgisUrl);
+		const arcResp = await fetch(arcgisUrl, {
+			signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+		});
+		if (!arcResp.ok) {
+			return {
+				ok: false,
+				error: `ArcGIS error ${arcResp.status}`,
+				status: 500,
+			};
+		}
 		const arcData = await arcResp.json();
 
 		const value = arcData?.results?.[0]?.value || {};
