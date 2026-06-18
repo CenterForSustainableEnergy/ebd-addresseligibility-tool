@@ -123,7 +123,7 @@ const MAX_REQUEST_BODY_SIZE = (() => {
 		: DEFAULT_MAX_REQUEST_BODY_SIZE;
 })();
 
-const FETCH_TIMEOUT_MS = 10_000;
+const FETCH_TIMEOUT_MS = 20_000;
 const MAX_ADDRESS_LENGTH = 500;
 
 const DEFAULT_BATCH_CONCURRENCY = 3;
@@ -406,6 +406,14 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 
 		return { ok: true, data: result };
 	} catch (err) {
+		if (err instanceof Error && err.name === "TimeoutError") {
+			return {
+				ok: false,
+				error:
+					"Request timed out — try a smaller batch or wait before retrying",
+				status: 500,
+			};
+		}
 		// Do not log the address (PII).
 		console.error("Address lookup failed:", err);
 		return { ok: false, error: "Address lookup failed", status: 500 };
