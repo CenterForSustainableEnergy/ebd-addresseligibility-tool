@@ -213,7 +213,6 @@ const jobs = new Map<string, BatchJob>();
 
 type ErrorLogEntry = {
 	timestamp: string;
-	address: string;
 	error: string;
 	source: "batch" | "single";
 	jobId?: string;
@@ -223,14 +222,12 @@ const MAX_ERROR_LOG = 500;
 const errorLog: ErrorLogEntry[] = [];
 
 function recordError(
-	address: string,
 	error: string,
 	source: "batch" | "single",
 	jobId?: string,
 ) {
 	errorLog.push({
 		timestamp: new Date().toISOString(),
-		address,
 		error,
 		source,
 		jobId,
@@ -529,7 +526,7 @@ async function processBatchFile(job: BatchJob, file: File) {
 						} else {
 							job.errors += 1;
 							job.results.push({ InputAddress: address, Error: lookup.error });
-							recordError(address, lookup.error, "batch", job.id);
+							recordError(lookup.error, "batch", job.id);
 						}
 					})
 					.catch((err) => {
@@ -540,7 +537,7 @@ async function processBatchFile(job: BatchJob, file: File) {
 							InputAddress: address,
 							Error: "Processing failed",
 						});
-						recordError(address, "Processing failed", "batch", job.id);
+						recordError("Processing failed", "batch", job.id);
 					})
 					.finally(() => {
 						pending -= 1;
@@ -750,14 +747,14 @@ app.post("/api/lookup-single", async (c) => {
 
 		const lookup = await lookupAddress(address);
 		if (lookup.ok !== true) {
-			recordError(address, lookup.error, "single");
+			recordError(lookup.error, "single");
 			return c.json({ error: lookup.error }, lookup.status);
 		}
 
 		return c.json(lookup.data);
 	} catch (err) {
 		console.error("Single address lookup failed:", err);
-		recordError("unknown", "Address lookup failed", "single");
+		recordError("Address lookup failed", "single");
 		return c.json({ error: "Address lookup failed" }, 500);
 	}
 });
