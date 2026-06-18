@@ -119,6 +119,7 @@ const MAX_REQUEST_BODY_SIZE = (() => {
 })();
 
 const FETCH_TIMEOUT_MS = 10_000;
+const MAX_ADDRESS_LENGTH = 500;
 
 const DEFAULT_BATCH_CONCURRENCY = 3;
 const BATCH_CONCURRENCY = (() => {
@@ -264,19 +265,14 @@ function getJob(id: string) {
 async function lookupAddress(address: string): Promise<LookupResult> {
 	try {
 		// Step 1: Validate / geocode via Smarty.
-		// Credentials go in the Authorization header to keep them out of access logs.
 		// Try match=enhanced first (accepts non-USPS-deliverable physical locations).
 		// Fall back to match=invalid only on a successful 200 with no candidates —
 		// this corrects minor misspellings without retrying on rate-limit errors.
+		// Note: Smarty's US Street API requires credentials as query parameters;
+		// it does not support the Authorization header for this endpoint.
 		const smartyUrl = (match: string) =>
-			`https://us-street.api.smarty.com/street-address?street=${encodeURIComponent(address)}&match=${match}`;
-		const smartyHeaders = {
-			Authorization: `Smarty key=${SMARTY_AUTH_ID}:${SMARTY_AUTH_TOKEN}`,
-		};
-		const smartyOpts = {
-			headers: smartyHeaders,
-			signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-		};
+			`https://us-street.api.smarty.com/street-address?auth-id=${SMARTY_AUTH_ID}&auth-token=${SMARTY_AUTH_TOKEN}&street=${encodeURIComponent(address)}&match=${match}`;
+		const smartyOpts = { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) };
 
 		let smartyResp = await fetch(smartyUrl("enhanced"), smartyOpts);
 		if (smartyResp.status === 429) {
@@ -517,7 +513,7 @@ async function processBatchFile(job: BatchJob, file: File) {
 				}
 
 				const address = extractAddress(row.data, columnMap);
-				if (!address) return;
+				if (!address || address.length > MAX_ADDRESS_LENGTH) return;
 
 				job.total += 1;
 				pending += 1;
@@ -744,6 +740,12 @@ app.post("/api/lookup-single", async (c) => {
 
 		if (!address) {
 			return c.json({ error: "No address provided" }, 400);
+		}
+		if (address.length > MAX_ADDRESS_LENGTH) {
+			return c.json(
+				{ error: `Address must be ${MAX_ADDRESS_LENGTH} characters or fewer` },
+				400,
+			);
 		}
 
 		const lookup = await lookupAddress(address);
