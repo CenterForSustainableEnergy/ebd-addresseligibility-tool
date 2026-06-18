@@ -146,6 +146,8 @@ const JOB_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
 const HALF_MILE_DAC_PREFIX = "dac 1/2 mile neighbor:";
 
+// ArcGIS overlay values can be prefixed with "preview for "; strip that and
+// normalize so eligibility checks aren't sensitive to whitespace / casing.
 function cleanOverlayLabel(value: unknown): string {
 	if (typeof value !== "string") return "";
 	return value.replace(/^preview\s+for\s+/i, "").trim();
