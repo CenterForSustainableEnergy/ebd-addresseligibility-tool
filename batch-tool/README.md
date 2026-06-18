@@ -40,7 +40,7 @@ Optional tuning variables (all have sensible defaults):
 | ------------------------ | ----------- | -------------------------------------------------- |
 | `PORT`                   | `3100`      | HTTP listen port                                   |
 | `BATCH_CONCURRENCY`      | `3`         | Max addresses geocoded in parallel per job         |
-| `MAX_REQUEST_BODY_SIZE`  | `256 MiB`   | Upload size limit (bytes)                           |
+| `MAX_REQUEST_BODY_SIZE`  | `256 MiB`   | Upload size limit (bytes)                          |
 | `JOB_TTL_MS`             | `1800000`   | How long a finished job's results stay in memory   |
 
 Run:
@@ -79,7 +79,11 @@ misspellings at the cost of looser matching.
 
 ## Input CSV format
 
-A header row with an `address` column is required. One full address per row:
+The tool accepts two address layouts — single-column or multi-column. Column names are **case-insensitive**.
+
+### Single-column (full address)
+
+Include an `address` column with one complete address per row:
 
 ```csv
 address
@@ -95,6 +99,26 @@ address
 > "4725 Cebrian Ave, New Cuyama, CA, 93254"
 > ```
 
+### Multi-column (street, city, state, zip)
+
+Include separate columns for the address parts. At minimum you need a street column plus at least one of city, state, or zip:
+
+```csv
+street,city,state,zip
+2600 Fresno St,Fresno,CA,93721
+27272 Willowbank Rd,Davis,CA,95618
+```
+
+Recognized column name aliases (matching is case-insensitive):
+
+- **Full address:** `address`, `full address`, `full_address`
+- **Street:** `street`, `street address`, `street_address`, `address1`, `address_1`, `addr`, `addr1`, `address:street`
+- **City:** `city`, `city name`, `city_name`, `municipality`, `address:city`
+- **State:** `state`, `st`, `state code`, `state_code`, `address:state`
+- **Zip:** `zip`, `zip code`, `zip_code`, `zipcode`, `postal code`, `postal_code`, `address:zip`
+
+If no recognized address column is found the job fails immediately with a message listing the column names that were found.
+
 A sample file is provided at [`data/addresses.csv`](data/addresses.csv).
 
 ---
@@ -102,13 +126,13 @@ A sample file is provided at [`data/addresses.csv`](data/addresses.csv).
 ## API reference
 
 | Method & path                | Description                                                        |
-| ---------------------------- | ----------------------------------------------------------------- |
+| ---------------------------- | ------------------------------------------------------------------ |
 | `POST /api/upload-csv`       | Upload a CSV (`file` form field). Returns `{ jobId }` (202).       |
-| `GET  /api/batch-status/:id` | Job progress + `downloadUrl` when complete.                       |
+| `GET  /api/batch-status/:id` | Job progress + `downloadUrl` when complete.                        |
 | `GET  /api/batch-results/:id`| Results CSV download (only when job is `completed`).               |
-| `POST /api/lookup-single`    | Look up a single address (`{ "address": "..." }`).                |
-| `GET  /api/errors`           | Recent address-lookup failures (see below).                       |
-| `GET  /api/health`           | Liveness check.                                                   |
+| `POST /api/lookup-single`    | Look up a single address (`{ "address": "..." }`).                 |
+| `GET  /api/errors`           | Recent address-lookup failures (see below).                        |
+| `GET  /api/health`           | Liveness check.                                                    |
 
 ### `GET /api/errors`
 

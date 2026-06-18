@@ -362,6 +362,67 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 	}
 }
 
+class UserError extends Error {}
+
+const ADDRESS_COLUMN_ALIASES: Record<string, string[]> = {
+	full: ["address", "full address", "full_address"],
+	street: [
+		"address:street",
+		"street",
+		"street address",
+		"street_address",
+		"address1",
+		"address_1",
+		"addr",
+		"addr1",
+	],
+	city: ["address:city", "city", "city name", "city_name", "municipality"],
+	state: ["address:state", "state", "st", "state code", "state_code"],
+	zip: [
+		"address:zip",
+		"zip",
+		"zip code",
+		"zip_code",
+		"zipcode",
+		"postal code",
+		"postal_code",
+	],
+};
+
+type AddressColumnMap = Partial<
+	Record<"full" | "street" | "city" | "state" | "zip", string>
+>;
+
+function detectAddressColumns(fields: string[]): AddressColumnMap | null {
+	const map: AddressColumnMap = {};
+	for (const field of fields) {
+		const lower = field.toLowerCase().trim();
+		for (const [role, aliases] of Object.entries(ADDRESS_COLUMN_ALIASES)) {
+			if (aliases.includes(lower)) {
+				map[role as keyof AddressColumnMap] = field;
+				break;
+			}
+		}
+	}
+	if (map.full) return map;
+	if (map.street && (map.city || map.state || map.zip)) return map;
+	return null;
+}
+
+function extractAddress(
+	row: Record<string, string | undefined>,
+	map: AddressColumnMap,
+): string | undefined {
+	if (map.full) return row[map.full]?.trim();
+	const parts = (["street", "city", "state", "zip"] as const)
+		.map((role) => {
+			const col = map[role];
+			return col ? row[col]?.trim() : undefined;
+		})
+		.filter(Boolean);
+	return parts.length ? parts.join(", ") : undefined;
+}
+
 async function processBatchFile(job: BatchJob, file: File) {
 	const maxConcurrent = Math.max(1, BATCH_CONCURRENCY);
 	let pending = 0;
@@ -382,12 +443,30 @@ async function processBatchFile(job: BatchJob, file: File) {
 				? readable.fromWeb(file.stream())
 				: Readable.from(file.stream() as unknown as AsyncIterable<unknown>);
 
-		Papa.parse<{ address?: string }>(fileStream, {
+		let columnMap: AddressColumnMap | undefined;
+		let detectionError: string | null = null;
+
+		Papa.parse<Record<string, string>>(fileStream, {
 			header: true,
 			skipEmptyLines: true,
 			step: (row, parser) => {
 				parserRef = parser;
-				const address = row.data?.address?.trim();
+
+				if (columnMap === undefined) {
+					const fields = row.meta.fields ?? [];
+					const detected = detectAddressColumns(fields);
+					if (detected === null) {
+						detectionError =
+							`No recognized address column found. Expected an "address" column, ` +
+							`or columns for street and city/state/zip (e.g., "street", "city", "state", "zip"). ` +
+							`Found: ${fields.length ? fields.join(", ") : "(no headers)"}`;
+						parser.abort();
+						return;
+					}
+					columnMap = detected;
+				}
+
+				const address = extractAddress(row.data, columnMap);
 				if (!address) return;
 
 				job.total += 1;
@@ -430,6 +509,10 @@ async function processBatchFile(job: BatchJob, file: File) {
 					});
 			},
 			complete: () => {
+				if (detectionError) {
+					reject(new UserError(detectionError));
+					return;
+				}
 				parseDone = true;
 				checkDone();
 			},
@@ -440,9 +523,11 @@ async function processBatchFile(job: BatchJob, file: File) {
 	try {
 		await waitForAll;
 	} catch (err) {
-		console.error("Batch CSV parsing failed:", err);
+		if (!(err instanceof UserError))
+			console.error("Batch CSV parsing failed:", err);
 		job.status = "failed";
-		job.errorMessage = "CSV parsing failed";
+		job.errorMessage =
+			err instanceof UserError ? err.message : "CSV parsing failed";
 		job.finishedAt = Date.now();
 		return;
 	}
