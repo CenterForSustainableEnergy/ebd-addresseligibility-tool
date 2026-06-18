@@ -10,6 +10,11 @@ import Papa from "papaparse";
 
 import XLSX from "xlsx";
 
+// Bun-specific: import.meta.dir is the directory of this source file.
+// Using it (rather than process.cwd()) anchors static-file paths to the
+// project layout regardless of which directory the server is started from.
+const __dir = (import.meta as unknown as { dir: string }).dir;
+
 // --- Load CFA tract lookup (tract ID → CFA label) ---
 const NOT_IN_ICFA = "Not in current ICFA";
 const NOT_IN_TRACT_LIST = "Not in Census Tract List. Contact CSE for update.";
@@ -612,7 +617,7 @@ app.use("*", cors());
 
 // Serve main HTML page at "/"
 app.get("/", async (c) => {
-	const filePath = path.join(process.cwd(), "public", "index.html");
+	const filePath = path.join(__dir, "..", "public", "index.html");
 	const html = await fs.promises.readFile(filePath, "utf8");
 	return c.html(html);
 });
@@ -763,7 +768,7 @@ app.post("/api/lookup-single", async (c) => {
 app.use(
 	"*",
 	serveStatic({
-		root: path.join(process.cwd(), "public"),
+		root: path.join(__dir, "..", "public"),
 	}),
 );
 
