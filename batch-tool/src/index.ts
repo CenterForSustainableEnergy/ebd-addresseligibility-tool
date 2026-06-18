@@ -482,16 +482,15 @@ function extractAddress(
 }
 
 async function processBatchFile(job: BatchJob, file: File) {
-	const maxConcurrent = Math.max(1, BATCH_CONCURRENCY);
-	let pending = 0;
-	let parseDone = false;
-	let parserPaused = false;
-	let parserRef: Papa.Parser | null = null;
-
-	const waitForAll = new Promise<void>((resolve, reject) => {
-		const checkDone = () => {
-			if (parseDone && pending === 0) resolve();
-		};
+	// Phase 1: stream-parse the CSV and collect all valid addresses.
+	// PapaParse buffers small files in a single read, so pause/resume inside
+	// the step callback does not throttle concurrency — all step() calls fire
+	// synchronously before any pause can take effect. Collecting first and
+	// processing in a separate phase lets us apply a real semaphore.
+	const addresses = await new Promise<string[]>((resolve, reject) => {
+		const collected: string[] = [];
+		let columnMap: AddressColumnMap | undefined;
+		let detectionError: string | null = null;
 
 		const readable = Readable as typeof Readable & {
 			fromWeb?: (stream: ReadableStream) => Readable;
@@ -501,15 +500,10 @@ async function processBatchFile(job: BatchJob, file: File) {
 				? readable.fromWeb(file.stream())
 				: Readable.from(file.stream() as unknown as AsyncIterable<unknown>);
 
-		let columnMap: AddressColumnMap | undefined;
-		let detectionError: string | null = null;
-
 		Papa.parse<Record<string, string>>(fileStream, {
 			header: true,
 			skipEmptyLines: true,
 			step: (row, parser) => {
-				parserRef = parser;
-
 				if (columnMap === undefined) {
 					const fields = row.meta.fields ?? [];
 					const detected = detectAddressColumns(fields);
@@ -523,79 +517,91 @@ async function processBatchFile(job: BatchJob, file: File) {
 					}
 					columnMap = detected;
 				}
-
 				const address = extractAddress(row.data, columnMap);
-				if (!address || address.length > MAX_ADDRESS_LENGTH) return;
-
-				job.total += 1;
-				pending += 1;
-				if (!parserPaused && pending >= maxConcurrent) {
-					parser.pause();
-					parserPaused = true;
+				if (address && address.length <= MAX_ADDRESS_LENGTH) {
+					collected.push(address);
 				}
-
-				lookupAddress(address)
-					.then((lookup) => {
-						if (lookup.ok === true) {
-							job.results.push(lookup.data);
-						} else {
-							job.errors += 1;
-							job.results.push({ InputAddress: address, Error: lookup.error });
-							recordError(lookup.error, "batch", job.id);
-						}
-					})
-					.catch((err) => {
-						// Do not log the address (PII).
-						console.error("Error processing an address:", err);
-						job.errors += 1;
-						job.results.push({
-							InputAddress: address,
-							Error: "Processing failed",
-						});
-						recordError("Processing failed", "batch", job.id);
-					})
-					.finally(() => {
-						pending -= 1;
-						job.processed += 1;
-
-						if (!parseDone && parserPaused && pending < maxConcurrent) {
-							parserRef?.resume();
-							parserPaused = false;
-						}
-
-						checkDone();
-					});
 			},
 			complete: () => {
 				if (detectionError) {
 					reject(new UserError(detectionError));
 					return;
 				}
-				parseDone = true;
-				checkDone();
+				resolve(collected);
 			},
 			error: (err) => reject(err),
 		});
-	});
-
-	try {
-		await waitForAll;
-	} catch (err) {
+	}).catch((err: unknown) => {
 		if (!(err instanceof UserError))
 			console.error("Batch CSV parsing failed:", err);
 		job.status = "failed";
 		job.errorMessage =
-			err instanceof UserError ? err.message : "CSV parsing failed";
+			err instanceof UserError
+				? (err as UserError).message
+				: "CSV parsing failed";
 		job.finishedAt = Date.now();
-		return;
-	}
+		return null;
+	});
 
-	if (!job.total) {
+	if (addresses === null) return;
+
+	if (!addresses.length) {
 		job.status = "failed";
 		job.errorMessage = "CSV is empty or invalid format";
 		job.finishedAt = Date.now();
 		return;
 	}
+
+	job.total = addresses.length;
+
+	// Phase 2: process with a semaphore so BATCH_CONCURRENCY is enforced.
+	const maxConcurrent = Math.max(1, BATCH_CONCURRENCY);
+	let freeSlots = maxConcurrent;
+	const waiters: Array<() => void> = [];
+
+	function acquire(): Promise<void> {
+		if (freeSlots > 0) {
+			freeSlots -= 1;
+			return Promise.resolve();
+		}
+		return new Promise<void>((resolve) => {
+			waiters.push(resolve);
+		});
+	}
+
+	function release(): void {
+		const next = waiters.shift();
+		if (next) {
+			next();
+		} else {
+			freeSlots += 1;
+		}
+	}
+
+	await Promise.all(
+		addresses.map(async (address) => {
+			await acquire();
+			try {
+				const lookup = await lookupAddress(address);
+				if (lookup.ok === true) {
+					job.results.push(lookup.data);
+				} else {
+					job.errors += 1;
+					job.results.push({ InputAddress: address, Error: lookup.error });
+					recordError(lookup.error, "batch", job.id);
+				}
+			} catch (err) {
+				// Do not log the address (PII).
+				console.error("Error processing an address:", err);
+				job.errors += 1;
+				job.results.push({ InputAddress: address, Error: "Processing failed" });
+				recordError("Processing failed", "batch", job.id);
+			} finally {
+				release();
+				job.processed += 1;
+			}
+		}),
+	);
 
 	const ALL_FIELDS: string[] = [
 		"InputAddress",
