@@ -289,9 +289,9 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 		// it does not support the Authorization header for this endpoint.
 		const smartyUrl = (match: string) =>
 			`https://us-street.api.smarty.com/street-address?auth-id=${SMARTY_AUTH_ID}&auth-token=${SMARTY_AUTH_TOKEN}&street=${encodeURIComponent(address)}&match=${match}`;
-		const smartyOpts = { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) };
-
-		let smartyResp = await fetch(smartyUrl("enhanced"), smartyOpts);
+		let smartyResp = await fetch(smartyUrl("enhanced"), {
+			signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+		});
 		if (smartyResp.status === 429) {
 			return {
 				ok: false,
@@ -311,7 +311,9 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 
 		if (!smartyData?.length) {
 			// Only fall back when enhanced returned 200 with no candidates.
-			smartyResp = await fetch(smartyUrl("invalid"), smartyOpts);
+			smartyResp = await fetch(smartyUrl("invalid"), {
+				signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+			});
 			if (smartyResp.status === 429) {
 				return {
 					ok: false,
