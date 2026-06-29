@@ -279,7 +279,10 @@ function getJob(id: string) {
 	return job;
 }
 
-async function lookupAddress(address: string): Promise<LookupResult> {
+async function lookupAddress(
+	address: string,
+	attempt = 0,
+): Promise<LookupResult> {
 	try {
 		// Step 1: Validate / geocode via Smarty.
 		// Try match=enhanced first (accepts non-USPS-deliverable physical locations).
