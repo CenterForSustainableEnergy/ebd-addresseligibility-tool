@@ -10,6 +10,11 @@ import Papa from "papaparse";
 
 import XLSX from "xlsx";
 
+// Bun-specific: import.meta.dir is the directory of this source file.
+// Using it (rather than process.cwd()) anchors static-file paths to the
+// project layout regardless of which directory the server is started from.
+const __dir = (import.meta as unknown as { dir: string }).dir;
+
 // --- Load CFA tract lookup (tract ID → CFA label) ---
 const NOT_IN_ICFA = "Not in current ICFA";
 const NOT_IN_TRACT_LIST = "Not in Census Tract List. Contact CSE for update.";
@@ -118,6 +123,9 @@ const MAX_REQUEST_BODY_SIZE = (() => {
 		: DEFAULT_MAX_REQUEST_BODY_SIZE;
 })();
 
+const FETCH_TIMEOUT_MS = 20_000;
+const MAX_ADDRESS_LENGTH = 500;
+
 const DEFAULT_BATCH_CONCURRENCY = 3;
 const BATCH_CONCURRENCY = (() => {
 	const raw = process.env.BATCH_CONCURRENCY;
@@ -126,6 +134,19 @@ const BATCH_CONCURRENCY = (() => {
 		? Math.floor(parsed)
 		: DEFAULT_BATCH_CONCURRENCY;
 })();
+
+// Maximum number of batch jobs that may be actively processing at once.
+// Additional uploads are rejected with 429 until a slot opens.
+const DEFAULT_MAX_ACTIVE_JOBS = 3;
+const MAX_ACTIVE_JOBS = (() => {
+	const raw = process.env.MAX_ACTIVE_JOBS;
+	const parsed = raw ? Number(raw) : Number.NaN;
+	return Number.isFinite(parsed) && parsed > 0
+		? Math.floor(parsed)
+		: DEFAULT_MAX_ACTIVE_JOBS;
+})();
+
+let activeJobCount = 0;
 
 const DEFAULT_JOB_TTL_MS = 30 * 60 * 1000;
 const JOB_TTL_MS = (() => {
@@ -138,6 +159,8 @@ const JOB_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
 const HALF_MILE_DAC_PREFIX = "dac 1/2 mile neighbor:";
 
+// ArcGIS overlay values can be prefixed with "preview for "; strip that and
+// normalize so eligibility checks aren't sensitive to whitespace / casing.
 function cleanOverlayLabel(value: unknown): string {
 	if (typeof value !== "string") return "";
 	return value.replace(/^preview\s+for\s+/i, "").trim();
@@ -200,7 +223,7 @@ type BatchJob = {
 	errorMessage?: string;
 };
 
-type LookupErrorStatus = 400 | 404 | 500;
+type LookupErrorStatus = 400 | 404 | 429 | 500;
 
 type LookupResult =
 	| { ok: true; data: AddressResult }
@@ -210,7 +233,6 @@ const jobs = new Map<string, BatchJob>();
 
 type ErrorLogEntry = {
 	timestamp: string;
-	address: string;
 	error: string;
 	source: "batch" | "single";
 	jobId?: string;
@@ -220,14 +242,12 @@ const MAX_ERROR_LOG = 500;
 const errorLog: ErrorLogEntry[] = [];
 
 function recordError(
-	address: string,
 	error: string,
 	source: "batch" | "single",
 	jobId?: string,
 ) {
 	errorLog.push({
 		timestamp: new Date().toISOString(),
-		address,
 		error,
 		source,
 		jobId,
@@ -259,21 +279,67 @@ function getJob(id: string) {
 	return job;
 }
 
-async function lookupAddress(address: string): Promise<LookupResult> {
+async function lookupAddress(
+	address: string,
+	attempt = 0,
+): Promise<LookupResult> {
 	try {
 		// Step 1: Validate / geocode via Smarty.
 		// Try match=enhanced first (accepts non-USPS-deliverable physical locations).
-		// Fall back to match=invalid if enhanced returns nothing — this corrects
-		// minor street-name misspellings at the cost of accepting looser matches.
-		const smartyBase = `https://us-street.api.smarty.com/street-address?auth-id=${SMARTY_AUTH_ID}&auth-token=${SMARTY_AUTH_TOKEN}&street=${encodeURIComponent(address)}`;
-		let smartyData = await fetch(`${smartyBase}&match=enhanced`).then((r) =>
-			r.json(),
-		);
+		// Fall back to match=invalid only on a successful 200 with no candidates —
+		// this corrects minor misspellings without retrying on rate-limit errors.
+		// Note: Smarty's US Street API requires credentials as query parameters;
+		// it does not support the Authorization header for this endpoint.
+		const smartyUrl = (match: string) => {
+			const params = new URLSearchParams({
+				"auth-id": SMARTY_AUTH_ID,
+				"auth-token": SMARTY_AUTH_TOKEN,
+				street: address,
+				match,
+			});
+			return `https://us-street.api.smarty.com/street-address?${params}`;
+		};
+		let smartyResp = await fetch(smartyUrl("enhanced"), {
+			signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+		});
+		if (smartyResp.status === 429) {
+			return {
+				ok: false,
+				error:
+					"Smarty rate limit exceeded — reduce batch size or wait before retrying",
+				status: 429,
+			};
+		}
+		if (!smartyResp.ok) {
+			return {
+				ok: false,
+				error: `Smarty error ${smartyResp.status}`,
+				status: 500,
+			};
+		}
+		let smartyData = await smartyResp.json();
 
 		if (!smartyData?.length) {
-			smartyData = await fetch(`${smartyBase}&match=invalid`).then((r) =>
-				r.json(),
-			);
+			// Only fall back when enhanced returned 200 with no candidates.
+			smartyResp = await fetch(smartyUrl("invalid"), {
+				signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+			});
+			if (smartyResp.status === 429) {
+				return {
+					ok: false,
+					error:
+						"Smarty rate limit exceeded — reduce batch size or wait before retrying",
+					status: 429,
+				};
+			}
+			if (!smartyResp.ok) {
+				return {
+					ok: false,
+					error: `Smarty error ${smartyResp.status}`,
+					status: 500,
+				};
+			}
+			smartyData = await smartyResp.json();
 		}
 
 		if (!smartyData?.length) {
@@ -294,7 +360,16 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 
 		// Step 2: ArcGIS overlay
 		const arcgisUrl = `https://maps3.energycenter.org/arcgis/rest/services/sync/GPServer/LocOverlay_CT/execute?longitude=${lon}&latitude=${lat}&returnZ=false&returnM=false&returnTrueCurves=false&returnFeatureCollection=false&returnColumnName=false&simplifyFeatures=true&context=&f=pjson`;
-		const arcResp = await fetch(arcgisUrl);
+		const arcResp = await fetch(arcgisUrl, {
+			signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+		});
+		if (!arcResp.ok) {
+			return {
+				ok: false,
+				error: `ArcGIS error ${arcResp.status}`,
+				status: 500,
+			};
+		}
 		const arcData = await arcResp.json();
 
 		const value = arcData?.results?.[0]?.value || {};
@@ -356,23 +431,101 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 
 		return { ok: true, data: result };
 	} catch (err) {
+		// AbortSignal.timeout() throws TimeoutError per spec; Bun may throw AbortError instead.
+		if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+			if (attempt < 1) {
+				// One automatic retry after a short pause — recovers most transient
+				// Smarty hangs without masking genuine rate-limit exhaustion.
+				await new Promise<void>((resolve) => {
+					setTimeout(resolve, 2_000);
+				});
+				return lookupAddress(address, attempt + 1);
+			}
+			return {
+				ok: false,
+				error:
+					"Request timed out — try a smaller batch or wait before retrying",
+				status: 500,
+			};
+		}
 		// Do not log the address (PII).
 		console.error("Address lookup failed:", err);
 		return { ok: false, error: "Address lookup failed", status: 500 };
 	}
 }
 
-async function processBatchFile(job: BatchJob, file: File) {
-	const maxConcurrent = Math.max(1, BATCH_CONCURRENCY);
-	let pending = 0;
-	let parseDone = false;
-	let parserPaused = false;
-	let parserRef: Papa.Parser | null = null;
+class UserError extends Error {}
 
-	const waitForAll = new Promise<void>((resolve, reject) => {
-		const checkDone = () => {
-			if (parseDone && pending === 0) resolve();
-		};
+const ADDRESS_COLUMN_ALIASES: Record<string, string[]> = {
+	full: ["address", "full address", "full_address"],
+	street: [
+		"address:street",
+		"street",
+		"street address",
+		"street_address",
+		"address1",
+		"address_1",
+		"addr",
+		"addr1",
+	],
+	city: ["address:city", "city", "city name", "city_name", "municipality"],
+	state: ["address:state", "state", "st", "state code", "state_code"],
+	zip: [
+		"address:zip",
+		"zip",
+		"zip code",
+		"zip_code",
+		"zipcode",
+		"postal code",
+		"postal_code",
+	],
+};
+
+type AddressColumnMap = Partial<
+	Record<"full" | "street" | "city" | "state" | "zip", string>
+>;
+
+function detectAddressColumns(fields: string[]): AddressColumnMap | null {
+	const map: AddressColumnMap = {};
+	for (const field of fields) {
+		const lower = field.toLowerCase().trim();
+		for (const [role, aliases] of Object.entries(ADDRESS_COLUMN_ALIASES)) {
+			if (aliases.includes(lower)) {
+				map[role as keyof AddressColumnMap] = field;
+				break;
+			}
+		}
+	}
+	if (map.full) return map;
+	if (map.street && (map.city || map.state || map.zip)) return map;
+	return null;
+}
+
+function extractAddress(
+	row: Record<string, string | undefined>,
+	map: AddressColumnMap,
+): string | undefined {
+	if (map.full) return row[map.full]?.trim();
+	const parts = (["street", "city", "state", "zip"] as const)
+		.map((role) => {
+			const col = map[role];
+			return col ? row[col]?.trim() : undefined;
+		})
+		.filter(Boolean);
+	return parts.length ? parts.join(", ") : undefined;
+}
+
+async function processBatchFile(job: BatchJob, file: File) {
+	// Phase 1: stream-parse the CSV and collect all valid addresses.
+	// PapaParse buffers small files in a single read, so pause/resume inside
+	// the step callback does not throttle concurrency — all step() calls fire
+	// synchronously before any pause can take effect. Collecting first and
+	// processing in a separate phase lets us apply a real semaphore.
+	const addresses = await new Promise<string[]>((resolve, reject) => {
+		const collected: string[] = [];
+		const tooLong: string[] = [];
+		let columnMap: AddressColumnMap | undefined;
+		let detectionError: string | null = null;
 
 		const readable = Readable as typeof Readable & {
 			fromWeb?: (stream: ReadableStream) => Readable;
@@ -382,77 +535,110 @@ async function processBatchFile(job: BatchJob, file: File) {
 				? readable.fromWeb(file.stream())
 				: Readable.from(file.stream() as unknown as AsyncIterable<unknown>);
 
-		Papa.parse<{ address?: string }>(fileStream, {
+		Papa.parse<Record<string, string>>(fileStream, {
 			header: true,
 			skipEmptyLines: true,
 			step: (row, parser) => {
-				parserRef = parser;
-				const address = row.data?.address?.trim();
-				if (!address) return;
-
-				job.total += 1;
-				pending += 1;
-				if (!parserPaused && pending >= maxConcurrent) {
-					parser.pause();
-					parserPaused = true;
+				if (columnMap === undefined) {
+					const fields = row.meta.fields ?? [];
+					const detected = detectAddressColumns(fields);
+					if (detected === null) {
+						detectionError =
+							`No recognized address column found. Expected an "address" column, ` +
+							`or columns for street and city/state/zip (e.g., "street", "city", "state", "zip"). ` +
+							`Found: ${fields.length ? fields.join(", ") : "(no headers)"}`;
+						parser.abort();
+						return;
+					}
+					columnMap = detected;
 				}
-
-				lookupAddress(address)
-					.then((lookup) => {
-						if (lookup.ok === true) {
-							job.results.push(lookup.data);
-						} else {
-							job.errors += 1;
-							job.results.push({ InputAddress: address, Error: lookup.error });
-							recordError(address, lookup.error, "batch", job.id);
-						}
-					})
-					.catch((err) => {
-						// Do not log the address (PII).
-						console.error("Error processing an address:", err);
-						job.errors += 1;
-						job.results.push({
-							InputAddress: address,
-							Error: "Processing failed",
-						});
-						recordError(address, "Processing failed", "batch", job.id);
-					})
-					.finally(() => {
-						pending -= 1;
-						job.processed += 1;
-
-						if (!parseDone && parserPaused && pending < maxConcurrent) {
-							parserRef?.resume();
-							parserPaused = false;
-						}
-
-						checkDone();
-					});
+				const address = extractAddress(row.data, columnMap);
+				if (address) {
+					if (address.length <= MAX_ADDRESS_LENGTH) {
+						collected.push(address);
+					} else {
+						tooLong.push(address);
+					}
+				}
 			},
 			complete: () => {
-				parseDone = true;
-				checkDone();
+				if (detectionError) {
+					reject(new UserError(detectionError));
+					return;
+				}
+				if (tooLong.length) {
+					const tooLongError = `Address must be ${MAX_ADDRESS_LENGTH} characters or fewer`;
+					job.results.push(
+						...tooLong.map((address) => ({
+							InputAddress: address,
+							Error: tooLongError,
+						})),
+					);
+					job.errors += tooLong.length;
+					job.processed += tooLong.length;
+				}
+				resolve(collected);
 			},
 			error: (err) => reject(err),
 		});
+	}).catch((err: unknown) => {
+		if (!(err instanceof UserError))
+			console.error("Batch CSV parsing failed:", err);
+		job.status = "failed";
+		job.errorMessage =
+			err instanceof UserError
+				? (err as UserError).message
+				: "CSV parsing failed";
+		job.finishedAt = Date.now();
+		return null;
 	});
 
-	try {
-		await waitForAll;
-	} catch (err) {
-		console.error("Batch CSV parsing failed:", err);
-		job.status = "failed";
-		job.errorMessage = "CSV parsing failed";
-		job.finishedAt = Date.now();
-		return;
-	}
+	if (addresses === null) return;
 
-	if (!job.total) {
+	const totalRows = addresses.length + job.processed;
+	if (!totalRows) {
 		job.status = "failed";
 		job.errorMessage = "CSV is empty or invalid format";
 		job.finishedAt = Date.now();
 		return;
 	}
+
+	job.total = totalRows;
+
+	// Phase 2: process with a worker pool so BATCH_CONCURRENCY is enforced
+	// without creating one promise per row.
+	const maxConcurrent = Math.max(1, BATCH_CONCURRENCY);
+	let nextIndex = 0;
+	const workerCount = Math.min(maxConcurrent, addresses.length);
+	await Promise.all(
+		Array.from({ length: workerCount }, async () => {
+			for (;;) {
+				const index = nextIndex;
+				nextIndex += 1;
+				if (index >= addresses.length) break;
+				const address = addresses[index];
+
+				try {
+					const lookup = await lookupAddress(address);
+					if (lookup.ok === true) {
+						job.results.push(lookup.data);
+					} else {
+						job.errors += 1;
+						job.results.push({ InputAddress: address, Error: lookup.error });
+						recordError(lookup.error, "batch", job.id);
+					}
+				} catch (err) {
+					// Do not log the address (PII).
+					console.error("Error processing an address:", err);
+					job.errors += 1;
+					job.results.push({ InputAddress: address, Error: "Processing failed" });
+					recordError("Processing failed", "batch", job.id);
+				} finally {
+					job.processed += 1;
+				}
+			}
+		}),
+	);
 
 	const ALL_FIELDS: string[] = [
 		"InputAddress",
@@ -484,7 +670,7 @@ app.use("*", cors());
 
 // Serve main HTML page at "/"
 app.get("/", async (c) => {
-	const filePath = path.join(process.cwd(), "public", "index.html");
+	const filePath = path.join(__dir, "..", "public", "index.html");
 	const html = await fs.promises.readFile(filePath, "utf8");
 	return c.html(html);
 });
@@ -501,6 +687,13 @@ app.post("/api/upload-csv", async (c) => {
 			return c.json({ error: "No CSV file uploaded" }, 400);
 		}
 
+		if (activeJobCount >= MAX_ACTIVE_JOBS) {
+			return c.json(
+				{ error: "Server busy — too many batches running, try again shortly" },
+				429,
+			);
+		}
+
 		const jobId = randomUUID();
 		const job: BatchJob = {
 			id: jobId,
@@ -512,13 +705,18 @@ app.post("/api/upload-csv", async (c) => {
 			results: [],
 		};
 		jobs.set(jobId, job);
+		activeJobCount += 1;
 
-		void processBatchFile(job, file).catch((err) => {
-			console.error("Batch processing failed:", err);
-			job.status = "failed";
-			job.errorMessage = "Batch processing failed";
-			job.finishedAt = Date.now();
-		});
+		void processBatchFile(job, file)
+			.catch((err) => {
+				console.error("Batch processing failed:", err);
+				job.status = "failed";
+				job.errorMessage = "Batch processing failed";
+				job.finishedAt = Date.now();
+			})
+			.finally(() => {
+				activeJobCount -= 1;
+			});
 
 		return c.json({ jobId }, 202);
 	} catch (err) {
@@ -610,17 +808,23 @@ app.post("/api/lookup-single", async (c) => {
 		if (!address) {
 			return c.json({ error: "No address provided" }, 400);
 		}
+		if (address.length > MAX_ADDRESS_LENGTH) {
+			return c.json(
+				{ error: `Address must be ${MAX_ADDRESS_LENGTH} characters or fewer` },
+				400,
+			);
+		}
 
 		const lookup = await lookupAddress(address);
 		if (lookup.ok !== true) {
-			recordError(address, lookup.error, "single");
+			recordError(lookup.error, "single");
 			return c.json({ error: lookup.error }, lookup.status);
 		}
 
 		return c.json(lookup.data);
 	} catch (err) {
 		console.error("Single address lookup failed:", err);
-		recordError("unknown", "Address lookup failed", "single");
+		recordError("Address lookup failed", "single");
 		return c.json({ error: "Address lookup failed" }, 500);
 	}
 });
@@ -629,7 +833,7 @@ app.post("/api/lookup-single", async (c) => {
 app.use(
 	"*",
 	serveStatic({
-		root: path.join(process.cwd(), "public"),
+		root: path.join(__dir, "..", "public"),
 	}),
 );
 
