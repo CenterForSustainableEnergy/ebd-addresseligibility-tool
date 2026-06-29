@@ -290,8 +290,15 @@ async function lookupAddress(
 		// this corrects minor misspellings without retrying on rate-limit errors.
 		// Note: Smarty's US Street API requires credentials as query parameters;
 		// it does not support the Authorization header for this endpoint.
-		const smartyUrl = (match: string) =>
-			`https://us-street.api.smarty.com/street-address?auth-id=${encodeURIComponent(SMARTY_AUTH_ID)}&auth-token=${encodeURIComponent(SMARTY_AUTH_TOKEN)}&street=${encodeURIComponent(address)}&match=${match}`;
+		const smartyUrl = (match: string) => {
+			const params = new URLSearchParams({
+				"auth-id": SMARTY_AUTH_ID,
+				"auth-token": SMARTY_AUTH_TOKEN,
+				street: address,
+				match,
+			});
+			return `https://us-street.api.smarty.com/street-address?${params}`;
+		};
 		let smartyResp = await fetch(smartyUrl("enhanced"), {
 			signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
 		});
@@ -424,6 +431,7 @@ async function lookupAddress(
 
 		return { ok: true, data: result };
 	} catch (err) {
+		// AbortSignal.timeout() throws TimeoutError per spec; Bun may throw AbortError instead.
 		if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
 			if (attempt < 1) {
 				// One automatic retry after a short pause — recovers most transient
