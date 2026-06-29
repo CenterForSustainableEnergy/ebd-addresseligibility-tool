@@ -515,6 +515,7 @@ async function processBatchFile(job: BatchJob, file: File) {
 	// processing in a separate phase lets us apply a real semaphore.
 	const addresses = await new Promise<string[]>((resolve, reject) => {
 		const collected: string[] = [];
+		const tooLong: string[] = [];
 		let columnMap: AddressColumnMap | undefined;
 		let detectionError: string | null = null;
 
@@ -544,14 +545,29 @@ async function processBatchFile(job: BatchJob, file: File) {
 					columnMap = detected;
 				}
 				const address = extractAddress(row.data, columnMap);
-				if (address && address.length <= MAX_ADDRESS_LENGTH) {
-					collected.push(address);
+				if (address) {
+					if (address.length <= MAX_ADDRESS_LENGTH) {
+						collected.push(address);
+					} else {
+						tooLong.push(address);
+					}
 				}
 			},
 			complete: () => {
 				if (detectionError) {
 					reject(new UserError(detectionError));
 					return;
+				}
+				if (tooLong.length) {
+					const tooLongError = `Address must be ${MAX_ADDRESS_LENGTH} characters or fewer`;
+					job.results.push(
+						...tooLong.map((address) => ({
+							InputAddress: address,
+							Error: tooLongError,
+						})),
+					);
+					job.errors += tooLong.length;
+					job.processed += tooLong.length;
 				}
 				resolve(collected);
 			},
@@ -571,60 +587,47 @@ async function processBatchFile(job: BatchJob, file: File) {
 
 	if (addresses === null) return;
 
-	if (!addresses.length) {
+	const totalRows = addresses.length + job.processed;
+	if (!totalRows) {
 		job.status = "failed";
 		job.errorMessage = "CSV is empty or invalid format";
 		job.finishedAt = Date.now();
 		return;
 	}
 
-	job.total = addresses.length;
+	job.total = totalRows;
 
-	// Phase 2: process with a semaphore so BATCH_CONCURRENCY is enforced.
+	// Phase 2: process with a worker pool so BATCH_CONCURRENCY is enforced
+	// without creating one promise per row.
 	const maxConcurrent = Math.max(1, BATCH_CONCURRENCY);
-	let freeSlots = maxConcurrent;
-	const waiters: Array<() => void> = [];
-
-	function acquire(): Promise<void> {
-		if (freeSlots > 0) {
-			freeSlots -= 1;
-			return Promise.resolve();
-		}
-		return new Promise<void>((resolve) => {
-			waiters.push(resolve);
-		});
-	}
-
-	function release(): void {
-		const next = waiters.shift();
-		if (next) {
-			next();
-		} else {
-			freeSlots += 1;
-		}
-	}
-
+	let nextIndex = 0;
+	const workerCount = Math.min(maxConcurrent, addresses.length);
 	await Promise.all(
-		addresses.map(async (address) => {
-			await acquire();
-			try {
-				const lookup = await lookupAddress(address);
-				if (lookup.ok === true) {
-					job.results.push(lookup.data);
-				} else {
+		Array.from({ length: workerCount }, async () => {
+			for (;;) {
+				const index = nextIndex;
+				nextIndex += 1;
+				if (index >= addresses.length) break;
+				const address = addresses[index];
+
+				try {
+					const lookup = await lookupAddress(address);
+					if (lookup.ok === true) {
+						job.results.push(lookup.data);
+					} else {
+						job.errors += 1;
+						job.results.push({ InputAddress: address, Error: lookup.error });
+						recordError(lookup.error, "batch", job.id);
+					}
+				} catch (err) {
+					// Do not log the address (PII).
+					console.error("Error processing an address:", err);
 					job.errors += 1;
-					job.results.push({ InputAddress: address, Error: lookup.error });
-					recordError(lookup.error, "batch", job.id);
+					job.results.push({ InputAddress: address, Error: "Processing failed" });
+					recordError("Processing failed", "batch", job.id);
+				} finally {
+					job.processed += 1;
 				}
-			} catch (err) {
-				// Do not log the address (PII).
-				console.error("Error processing an address:", err);
-				job.errors += 1;
-				job.results.push({ InputAddress: address, Error: "Processing failed" });
-				recordError("Processing failed", "batch", job.id);
-			} finally {
-				release();
-				job.processed += 1;
 			}
 		}),
 	);
