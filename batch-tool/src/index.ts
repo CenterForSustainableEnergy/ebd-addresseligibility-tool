@@ -422,15 +422,13 @@ async function lookupAddress(address: string): Promise<LookupResult> {
 		return { ok: true, data: result };
 	} catch (err) {
 		if (err instanceof Error && err.name === "TimeoutError") {
-			// One automatic retry after a short pause — recovers most transient
-			// Smarty hangs without masking genuine rate-limit exhaustion.
-			await new Promise<void>((resolve) => {
-				setTimeout(resolve, 2_000);
-			});
-			try {
-				return await lookupAddress(address);
-			} catch {
-				// Retry also timed out; give up with an actionable message.
+			if (attempt < 1) {
+				// One automatic retry after a short pause — recovers most transient
+				// Smarty hangs without masking genuine rate-limit exhaustion.
+				await new Promise<void>((resolve) => {
+					setTimeout(resolve, 2_000);
+				});
+				return lookupAddress(address, attempt + 1);
 			}
 			return {
 				ok: false,
