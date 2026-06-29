@@ -291,7 +291,7 @@ async function lookupAddress(
 		// Note: Smarty's US Street API requires credentials as query parameters;
 		// it does not support the Authorization header for this endpoint.
 		const smartyUrl = (match: string) =>
-			`https://us-street.api.smarty.com/street-address?auth-id=${SMARTY_AUTH_ID}&auth-token=${SMARTY_AUTH_TOKEN}&street=${encodeURIComponent(address)}&match=${match}`;
+			`https://us-street.api.smarty.com/street-address?auth-id=${encodeURIComponent(SMARTY_AUTH_ID)}&auth-token=${encodeURIComponent(SMARTY_AUTH_TOKEN)}&street=${encodeURIComponent(address)}&match=${match}`;
 		let smartyResp = await fetch(smartyUrl("enhanced"), {
 			signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
 		});
@@ -424,7 +424,7 @@ async function lookupAddress(
 
 		return { ok: true, data: result };
 	} catch (err) {
-		if (err instanceof Error && err.name === "TimeoutError") {
+		if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
 			if (attempt < 1) {
 				// One automatic retry after a short pause — recovers most transient
 				// Smarty hangs without masking genuine rate-limit exhaustion.
