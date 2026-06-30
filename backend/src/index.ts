@@ -339,9 +339,9 @@ app.post("/api/overlay", async (c) => {
 				If your income falls below the listed threshold, you can visit the application portal
 				to complete the next steps for upgrading your home.
 				<br><br>
-				<em>Note:</em> Income limits are current as of April 23, 2025 and may change based on
+				<em>Note:</em> Income limits are current as of June 23, 2026 and may change based on
 				federal or state guidelines.
-				<a href="https://www.hcd.ca.gov/sites/default/files/docs/grants-and-funding/income-limits-2025.pdf"
+				<a href="https://www.hcd.ca.gov/sites/default/files/docs/grants-and-funding/income-limits-2026.pdf"
 					target="_blank" rel="noopener noreferrer">Click here</a>
 				to learn more about income limits.
 `;
