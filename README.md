@@ -125,7 +125,7 @@ or
  bun run src/index.ts
  ```
 
-Backend starts on `http://localhost:3000` or `http://localhost:8282`.
+Backend starts on `http://localhost:3000`. Batch-tool starts on `http://localhost:8282`.
 
 ### 7. Test the Tool Locally
 
