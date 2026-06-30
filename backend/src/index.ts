@@ -338,13 +338,16 @@ app.post("/api/overlay", async (c) => {
 				<br><br>
 				If your income falls below the listed threshold, you can visit the application portal
 				to complete the next steps for upgrading your home.
-				<br><br>
-				<em>Note:</em> Income limits are current as of June 23, 2026 and may change based on
-				federal or state guidelines.
-				<a href="https://www.hcd.ca.gov/sites/default/files/docs/grants-and-funding/income-limits-2026.pdf"
-					target="_blank" rel="noopener noreferrer">Click here</a>
-				to learn more about income limits.
 `;
+			// Income-limits note removed per request. To restore it, re-insert the
+			// following lines inside the `message` template literal above (just
+			// after "...upgrading your home."):
+			//     <br><br>
+			//     <em>Note:</em> Income limits are current as of June 23, 2026 and may change based on
+			//     federal or state guidelines.
+			//     <a href="https://www.hcd.ca.gov/sites/default/files/docs/grants-and-funding/income-limits-2026.pdf"
+			//         target="_blank" rel="noopener noreferrer">Click here</a>
+			//     to learn more about income limits.
 			return c.json({
 				success: true,
 				eligible: true,
