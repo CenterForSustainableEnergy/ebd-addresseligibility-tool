@@ -125,7 +125,7 @@ or
  bun run src/index.ts
  ```
 
-Backend starts on `http://localhost:3000` or `http://localhost:3001`.
+Backend starts on `http://localhost:3000` or `http://localhost:8282`.
 
 ### 7. Test the Tool Locally
 
@@ -186,7 +186,7 @@ You should see:
      <rule name="BatchAPIReverseProxy" stopProcessing="true">
       <match url="^api/(.*)$" />
       <conditions logicalGrouping="MatchAll" trackAllCaptures="false" />
-      <action type="Rewrite" url="http://localhost:3001/api/{R:1}" />
+      <action type="Rewrite" url="http://localhost:8282/api/{R:1}" />
      </rule>
     </rules>
    </rewrite>
@@ -276,13 +276,13 @@ Restart IIS from powershell with `iisreset`
 
 ## Modification procedure
 
-If modifications are needed, you may need to force quit the currently running process. It doesn't always accept End commands from Task Scheduler. Remember there are two services running. The backend service is listening on Port `3000`, the batch-tool service on Port `3001`
+If modifications are needed, you may need to force quit the currently running process. It doesn't always accept End commands from Task Scheduler. Remember there are two services running. The backend service is listening on Port `3000`, the batch-tool service on Port `8282`
 
-1. Check to see if a previously started process is listening on port `3000` or `3001`:
+1. Check to see if a previously started process is listening on port `3000` or `8282`:
 
  ```powershell
  netstat -ano | findstr :3000
- netstat -ano | findstr :3001
+ netstat -ano | findstr :8282
  ```
 
 1. Force quit the running process:
