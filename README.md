@@ -125,7 +125,9 @@ or
  bun run src/index.ts
  ```
 
-Backend starts on `http://localhost:3000`. Batch-tool starts on `http://localhost:8282`.
+Backend starts on `http://localhost:3000`. Batch-tool starts on `http://localhost:3001`.
+
+> **Note:** The batch-tool port is configurable via `PORT` in `batch-tool/.env` and can differ per environment. The deployment server uses `3001`; some dev machines use `8282` (corporate security policies may block ports outside 8000–8999). If no `PORT` is set, the code falls back to `3100`. Make sure the batch-tool IIS `web.config` reverse-proxy target matches whatever port that environment runs on.
 
 ### 7. Test the Tool Locally
 
@@ -186,7 +188,7 @@ You should see:
      <rule name="BatchAPIReverseProxy" stopProcessing="true">
       <match url="^api/(.*)$" />
       <conditions logicalGrouping="MatchAll" trackAllCaptures="false" />
-      <action type="Rewrite" url="http://localhost:8282/api/{R:1}" />
+      <action type="Rewrite" url="http://localhost:3001/api/{R:1}" />
      </rule>
     </rules>
    </rewrite>
@@ -276,13 +278,13 @@ Restart IIS from powershell with `iisreset`
 
 ## Modification procedure
 
-If modifications are needed, you may need to force quit the currently running process. It doesn't always accept End commands from Task Scheduler. Remember there are two services running. The backend service is listening on Port `3000`, the batch-tool service on Port `8282`
+If modifications are needed, you may need to force quit the currently running process. It doesn't always accept End commands from Task Scheduler. Remember there are two services running. The backend service is listening on Port `3000`, the batch-tool service on Port `3001`
 
-1. Check to see if a previously started process is listening on port `3000` or `8282`:
+1. Check to see if a previously started process is listening on port `3000` or `3001`:
 
  ```powershell
  netstat -ano | findstr :3000
- netstat -ano | findstr :8282
+ netstat -ano | findstr :3001
  ```
 
 1. Force quit the running process:
