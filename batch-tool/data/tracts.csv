@@ -440,7 +440,7 @@ tract,region,eligible,CFA
 6085506203,Northern,FALSE,
 6085508301,Northern,FALSE,
 6081602602,Northern,FALSE,
-6029004802,Central,TRUE,Delano
+6029004802,Central,FALSE,
 6081606700,Northern,FALSE,
 6081600800,Northern,FALSE,
 6081608200,Northern,FALSE,
@@ -462,8 +462,8 @@ tract,region,eligible,CFA
 6001422901,Northern,FALSE,
 6001422800,Northern,FALSE,
 6045010500,Northern,FALSE,
-6029004904,Central,TRUE,Delano
-6029004801,Central,TRUE,Delano
+6029004904,Central,FALSE,
+6029004801,Central,FALSE,
 6075021600,Northern,FALSE,
 6075020401,Northern,FALSE,
 6081600702,Northern,FALSE,
@@ -490,7 +490,7 @@ tract,region,eligible,CFA
 6075010500,Northern,FALSE,
 6075016601,Northern,FALSE,
 6075021200,Northern,FALSE,
-6029005003,Central,TRUE,Delano
+6029005003,Central,FALSE,
 6085508602,Northern,FALSE,
 6085508601,Northern,FALSE,
 6041116000,Northern,FALSE,
@@ -502,7 +502,7 @@ tract,region,eligible,CFA
 6075013001,Northern,FALSE,
 6075017000,Northern,FALSE,
 6085508401,Northern,FALSE,
-6029004607,Central,TRUE,Delano
+6029004607,Central,FALSE,
 6075017101,Northern,FALSE,
 6081611300,Northern,FALSE,
 6037651221,Southern,FALSE,
@@ -514,7 +514,7 @@ tract,region,eligible,CFA
 6041117000,Northern,FALSE,
 6037670328,Southern,FALSE,
 6075021500,Northern,FALSE,
-6029004901,Central,TRUE,Delano
+6029004901,Central,FALSE,
 6001421100,Northern,FALSE,
 6001427800,Northern,FALSE,
 6001428000,Northern,FALSE,
@@ -580,10 +580,10 @@ tract,region,eligible,CFA
 6041130203,Northern,FALSE,
 6041131100,Northern,FALSE,
 6041133000,Northern,FALSE,
-6029005006,Central,TRUE,Delano
-6029004702,Central,TRUE,Delano
-6029005005,Central,TRUE,Delano
-6029004601,Central,TRUE,Delano
+6029005006,Central,FALSE,
+6029004702,Central,FALSE,
+6029005005,Central,FALSE,
+6029004601,Central,FALSE,
 6055201006,Northern,FALSE,
 6059032022,Southern,FALSE,
 6059032031,Southern,FALSE,
@@ -604,7 +604,7 @@ tract,region,eligible,CFA
 6059099217,Southern,FALSE,
 6059099246,Southern,FALSE,
 6063000201,Northern,FALSE,
-6029004606,Central,TRUE,Delano
+6029004606,Central,FALSE,
 6071011300,Southern,FALSE,
 6071011408,Southern,FALSE,
 6073000201,Southern,FALSE,
@@ -665,15 +665,15 @@ tract,region,eligible,CFA
 6073018601,Southern,FALSE,
 6073018616,Southern,FALSE,
 6073021402,Southern,FALSE,
-6029004605,Central,TRUE,Delano
-6029004903,Central,TRUE,Delano
+6029004605,Central,FALSE,
+6029004903,Central,FALSE,
 6081601604,Northern,FALSE,
 6081601700,Northern,FALSE,
 6081609603,Northern,FALSE,
 6081609900,Northern,FALSE,
-6029004603,Central,TRUE,Delano
-6029004703,Central,TRUE,Delano
-6029004704,Central,TRUE,Delano
+6029004603,Central,FALSE,
+6029004703,Central,FALSE,
+6029004704,Central,FALSE,
 6019003104,Central,TRUE,East Fresno (PG&E zonal gas decommissioning area)
 6019005608,Central,TRUE,East Fresno (PG&E zonal gas decommissioning area)
 6019005607,Central,TRUE,East Fresno (PG&E zonal gas decommissioning area)
