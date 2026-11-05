@@ -2352,7 +2352,7 @@ tract,region,eligible,CFA
 6075010701,Northern,FALSE,
 6107004301,Central,FALSE,
 6081610601,Northern,FALSE,
-6029002817,Central,FALSE,
+6029002817,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6081604200,Northern,FALSE,
 6037621001,Southern,FALSE,
 6059099416,Southern,FALSE,
@@ -2824,7 +2824,7 @@ tract,region,eligible,CFA
 6081610100,Northern,FALSE,
 6001444500,Northern,FALSE,
 6001444301,Northern,FALSE,
-6029000603,Central,FALSE,
+6029000603,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6001436601,Northern,FALSE,
 6059062620,Southern,FALSE,
 6001410000,Northern,FALSE,
@@ -2849,7 +2849,7 @@ tract,region,eligible,CFA
 6001443104,Northern,FALSE,
 6099002100,Central,FALSE,
 6075017801,Northern,FALSE,
-6029000601,Central,FALSE,
+6029000601,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6001436700,Northern,FALSE,
 6075980900,Northern,FALSE,
 6029005104,Central,FALSE,
@@ -2870,13 +2870,13 @@ tract,region,eligible,CFA
 6059062647,Southern,FALSE,
 6037574201,Southern,FALSE,
 6075012203,Northern,FALSE,
-6029002814,Central,FALSE,
+6029002814,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6075012202,Northern,FALSE,
 6001404101,Northern,FALSE,
 6029000201,Central,FALSE,
 6037408629,Southern,FALSE,
 6037503704,Southern,FALSE,
-6029001700,Central,FALSE,
+6029001700,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6075011300,Northern,FALSE,
 6029003307,Central,FALSE,
 6085500200,Northern,FALSE,
@@ -2908,14 +2908,14 @@ tract,region,eligible,CFA
 6001402700,Northern,FALSE,
 6001402600,Northern,FALSE,
 6037650605,Southern,FALSE,
-6029002825,Central,FALSE,
+6029002825,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6013357000,Northern,FALSE,
 6059052527,Southern,FALSE,
 6071009201,Southern,FALSE,
 6059052532,Southern,FALSE,
 6081605901,Northern,FALSE,
 6059099605,Southern,FALSE,
-6029002815,Central,FALSE,
+6029002815,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6029003500,Central,FALSE,
 6111008004,Central,FALSE,
 6085501601,Northern,FALSE,
@@ -3508,7 +3508,7 @@ tract,region,eligible,CFA
 6059063904,Southern,FALSE,
 6059062656,Southern,FALSE,
 6037503702,Southern,FALSE,
-6029001901,Central,FALSE,
+6029001901,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6085503112,Northern,FALSE,
 6037651101,Southern,FALSE,
 6013334007,Northern,FALSE,
@@ -3926,7 +3926,7 @@ tract,region,eligible,CFA
 6059063902,Southern,FALSE,
 6085503113,Northern,FALSE,
 6071002049,Southern,FALSE,
-6029002824,Central,FALSE,
+6029002824,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6059001604,Southern,FALSE,
 6001443322,Northern,FALSE,
 6001432602,Northern,FALSE,
@@ -4684,7 +4684,7 @@ tract,region,eligible,CFA
 6037980011,Southern,FALSE,
 6065045117,Southern,TRUE,Palm Springs/Coachella Valley
 6059052528,Southern,FALSE,
-6029002002,Central,FALSE,
+6029002002,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6059063103,Southern,FALSE,
 6037800504,Southern,FALSE,
 6081602001,Northern,FALSE,
@@ -4773,7 +4773,7 @@ tract,region,eligible,CFA
 6021010101,Northern,FALSE,
 6037480400,Southern,FALSE,
 6059021826,Southern,FALSE,
-6029001600,Central,FALSE,
+6029001600,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6085503402,Northern,FALSE,
 6037920110,Southern,FALSE,
 6065043266,Southern,FALSE,
@@ -4808,7 +4808,7 @@ tract,region,eligible,CFA
 6037601302,Southern,FALSE,
 6001432300,Northern,FALSE,
 6085504422,Northern,FALSE,
-6029003211,Central,FALSE,
+6029003211,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6085512310,Northern,FALSE,
 6071010904,Southern,FALSE,
 6113010509,Northern,FALSE,
@@ -4857,7 +4857,7 @@ tract,region,eligible,CFA
 6025011301,Southern,FALSE,
 6077002000,Central,FALSE,
 6099002303,Central,FALSE,
-6029001202,Central,FALSE,
+6029001202,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6029003210,Central,FALSE,
 6029005208,Central,FALSE,
 6019007003,Central,FALSE,
@@ -5195,7 +5195,7 @@ tract,region,eligible,CFA
 6071002051,Southern,FALSE,
 6037543501,Southern,FALSE,
 6037503302,Southern,FALSE,
-6029001500,Central,FALSE,
+6029001500,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6059001501,Southern,FALSE,
 6013303105,Northern,FALSE,
 6075023001,Northern,FALSE,
@@ -5279,7 +5279,7 @@ tract,region,eligible,CFA
 6075025701,Northern,FALSE,
 6037702700,Southern,FALSE,
 6037553100,Southern,FALSE,
-6029002702,Central,FALSE,
+6029002702,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6059052408,Southern,FALSE,
 6037403703,Southern,FALSE,
 6071000108,Southern,FALSE,
@@ -5391,7 +5391,7 @@ tract,region,eligible,CFA
 6005000303,Northern,FALSE,
 6007001800,Northern,FALSE,
 6007002402,Northern,FALSE,
-6029001301,Central,FALSE,
+6029001301,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6111006102,Central,FALSE,
 6013302013,Northern,TRUE,"Refinery corridor along the Sac river, Richmond, Antioch"
 6013355109,Northern,TRUE,"Refinery corridor along the Sac river, Richmond, Antioch"
@@ -5513,7 +5513,7 @@ tract,region,eligible,CFA
 6037910505,Southern,FALSE,
 6037910721,Southern,FALSE,
 6037980010,Southern,FALSE,
-6029001902,Central,FALSE,
+6029001902,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6053011204,Central,FALSE,
 6107002004,Central,FALSE,
 6027000400,Central,FALSE,
@@ -5652,7 +5652,7 @@ tract,region,eligible,CFA
 6031000406,Central,FALSE,
 6101051100,Northern,FALSE,
 6077002202,Central,FALSE,
-6029002804,Central,FALSE,
+6029002804,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6077004800,Central,FALSE,
 6077002702,Central,FALSE,
 6009000121,Central,FALSE,
@@ -5780,7 +5780,7 @@ tract,region,eligible,CFA
 6037401705,Southern,FALSE,
 6037551502,Southern,FALSE,
 6029001402,Central,FALSE,
-6029002901,Central,FALSE,
+6029002901,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6001438204,Northern,FALSE,
 6077005220,Central,FALSE,
 6037574202,Southern,FALSE,
@@ -6524,7 +6524,7 @@ tract,region,eligible,CFA
 6099002603,Central,FALSE,
 6077005211,Central,FALSE,
 6077005310,Central,FALSE,
-6029001302,Central,FALSE,
+6029001302,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6077005130,Central,FALSE,
 6047001006,Central,FALSE,
 6077003803,Central,FALSE,
@@ -6620,7 +6620,7 @@ tract,region,eligible,CFA
 6077004701,Central,FALSE,
 6039000903,Central,FALSE,
 6019006301,Central,FALSE,
-6029000602,Central,FALSE,
+6029000602,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6107003501,Central,FALSE,
 6077001700,Central,FALSE,
 6019004006,Central,FALSE,
@@ -6628,7 +6628,7 @@ tract,region,eligible,CFA
 6099003501,Central,FALSE,
 6077005406,Central,FALSE,
 6099000205,Central,FALSE,
-6029002001,Central,FALSE,
+6029002001,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6103000300,Northern,FALSE,
 6103000800,Northern,FALSE,
 6103001101,Northern,FALSE,
@@ -7068,7 +7068,7 @@ tract,region,eligible,CFA
 6029000505,Central,FALSE,
 6111000600,Central,FALSE,
 6083002308,Central,FALSE,
-6029002701,Central,FALSE,
+6029002701,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6077001501,Central,FALSE,
 6111004504,Central,FALSE,
 6111005308,Central,FALSE,
@@ -7337,7 +7337,7 @@ tract,region,eligible,CFA
 6095250400,Northern,FALSE,
 6037430701,Southern,FALSE,
 6001409700,Northern,FALSE,
-6029000701,Central,FALSE,
+6029000701,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6071010905,Southern,FALSE,
 6111001303,Central,FALSE,
 6047002602,Central,FALSE,
@@ -7346,7 +7346,7 @@ tract,region,eligible,CFA
 6039000111,Central,FALSE,
 6037601501,Southern,FALSE,
 6037601600,Southern,FALSE,
-6029003124,Central,FALSE,
+6029003124,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6111009700,Central,FALSE,
 6107000204,Central,FALSE,
 6037531800,Southern,TRUE,"East LA: City Terrace, Belvedere Gardens, South Montebello "
@@ -7380,7 +7380,7 @@ tract,region,eligible,CFA
 6071010031,Southern,FALSE,
 6037601801,Southern,FALSE,
 6071010036,Southern,FALSE,
-6029001401,Central,FALSE,
+6029001401,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6113010315,Northern,TRUE,NW of Sac - West Sacramento DAC
 6071002609,Southern,FALSE,
 6065044923,Southern,TRUE,Palm Springs/Coachella Valley
@@ -7424,7 +7424,7 @@ tract,region,eligible,CFA
 6111005700,Central,FALSE,
 6009000122,Central,FALSE,
 6111002301,Central,FALSE,
-6029003132,Central,FALSE,
+6029003132,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6083000301,Central,FALSE,
 6065030103,Southern,TRUE,"Riverside/San Bernardino – I-91 Corridor, Colton, Riverside "
 6065030300,Southern,TRUE,"Riverside/San Bernardino – I-91 Corridor, Colton, Riverside "
@@ -7472,7 +7472,7 @@ tract,region,eligible,CFA
 6077005303,Central,FALSE,
 6077004202,Central,FALSE,
 6039000603,Central,FALSE,
-6029003133,Central,FALSE,
+6029003133,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6019004211,Central,FALSE,
 6099003909,Central,FALSE,
 6019005507,Central,FALSE,
@@ -7580,7 +7580,7 @@ tract,region,eligible,CFA
 6037542104,Southern,FALSE,
 6085503601,Northern,FALSE,
 6037543502,Southern,FALSE,
-6029003217,Central,FALSE,
+6029003217,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6029003821,Central,FALSE,
 6037552200,Southern,FALSE,
 6059011502,Southern,FALSE,
@@ -7806,7 +7806,7 @@ tract,region,eligible,CFA
 6073021001,Southern,FALSE,
 6053000800,Central,FALSE,
 6029005409,Central,FALSE,
-6029002902,Central,FALSE,
+6029002902,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6077003501,Central,FALSE,
 6029003113,Central,FALSE,
 6077003409,Central,FALSE,
