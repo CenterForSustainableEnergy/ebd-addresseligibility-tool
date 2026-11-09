@@ -21,6 +21,12 @@ It can be embedded directly into the EBD program website via a single `<script>`
   - If outside the Central region → displays region + redirect link.
   - If inside Central but ineligible → shows email collection form for future updates.
   - If eligible → confirms geographic eligibility and directs to income eligibility table.
+  - **CFA-adjacent strips (2026-11):** a home in a Central tract that is *not*
+    a CFA tract is also eligible when its tract shares a border with a CFA
+    tract and the home is within half a mile of the DAC part of that CFA tract
+    (inside the CARB "DAC 1/2 mile neighbor" buffer). These strips are
+    precomputed in `data/cfa_adjacent_strips.geojson` (reason
+    `cfa_adjacent_dac_buffer`). See [Updating the CFA list](#updating-the-cfa-list).
 
 - **County income verification**  
   - Uses `county_income.csv` to show **maximum eligible income** for household sizes 1–8 by ZIP code.
@@ -303,6 +309,24 @@ If modifications are needed, you may need to force quit the currently running pr
  ```
 
 1. If modified, copy html into relevant inetpub folder.
+
+## Updating the CFA list
+
+`tracts.csv` exists twice (`backend/data/` and `batch-tool/data/`); keep the two
+identical. Whenever a tract gains or loses a CFA label, **rebuild the
+CFA-adjacent strips too** — they depend on which tracts are CFAs:
+
+```bash
+# in the ebd-surveyanalysis repo
+python scripts/build_cfa_adjacent_strips.py --tracts ../ebd-tool/backend/data/tracts.csv --out-dir <dir>
+```
+
+Copy `<dir>/cfa_adjacent_strips.geojson` into both `backend/data/` and
+`batch-tool/data/`. The file carries a fingerprint of the CFA list it was built
+from. If it doesn't match `tracts.csv`, both services log
+`CFA-adjacent strip eligibility is OFF` at startup and the strip rule is
+skipped (CFA-tract eligibility is unaffected), so check the startup log after
+any CFA-list change.
 
 ## Embedding the Widget on a Website
 
