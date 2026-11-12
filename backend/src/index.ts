@@ -5,6 +5,7 @@ import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import { rateLimiter } from "hono-rate-limiter";
 import Papa from "papaparse";
+import { loadStripIndex, stripCfaAt } from "./strips";
 
 // -----------------------------------
 // Environment Variables
@@ -31,6 +32,12 @@ const tractData: TractInfo[] = Papa.parse<TractInfo>(
 	...row,
 	tract: row.tract.toString().padStart(11, "0"),
 }));
+
+// Half-mile DAC strips in tracts bordering a CFA tract (see strips.ts).
+const adjacentStrips = loadStripIndex(
+	"backend/data/cfa_adjacent_strips.geojson",
+	tractData,
+);
 
 // -----------------------------------
 // Load County Income Data (ZIP-level)
@@ -326,12 +333,21 @@ app.post("/api/overlay", async (c) => {
 				county_income: countyIncome,
 			});
 
-		// Central region - eligibility requires the tract to be a CFA (the `CFA`
-		// column is populated in tracts.csv) AND to meet the DAC tract membership
-		// or 1/2-mile DAC buffer rule. Tracts that aren't CFAs are not eligible
-		// regardless of DAC status.
+		// Central region - eligible when either
+		//  (a) the tract is a CFA (the `CFA` column is populated in tracts.csv)
+		//      AND the home is in a DAC or its 1/2-mile buffer; or
+		//  (b) the tract is not a CFA but borders one, and the home is in the
+		//      1/2-mile buffer of the DAC part of that CFA tract (a precomputed
+		//      strip; see strips.ts).
 		const isCfa = Boolean(tractInfo.CFA?.trim());
-		if (tractInfo.region === "Central" && isCfa && geoEligible) {
+		const adjacentCfa =
+			tractInfo.region === "Central" && !isCfa && inDacBuffer
+				? stripCfaAt(adjacentStrips, tract, Number(lon), Number(lat))
+				: null;
+		if (
+			tractInfo.region === "Central" &&
+			((isCfa && geoEligible) || adjacentCfa)
+		) {
 			const message = `
 				It appears that your address may be within the eligible area for this program.
 				Please review the table below to see if your household income also meets the eligibility requirements.
@@ -354,7 +370,9 @@ app.post("/api/overlay", async (c) => {
 				tract: displayTract,
 				message,
 				region: "Central",
-				reason: dacReason, // "in_dac" or "dac_buffer"
+				// "in_dac", "dac_buffer", or "cfa_adjacent_dac_buffer"
+				reason: adjacentCfa ? "cfa_adjacent_dac_buffer" : dacReason,
+				...(adjacentCfa ? { adjacent_cfa: adjacentCfa } : {}),
 				carb_priority: { is_priority: isPriority, label: carbRaw || "" },
 				county_income: countyIncome,
 			});

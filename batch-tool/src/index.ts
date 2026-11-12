@@ -9,6 +9,8 @@ import { cors } from "hono/cors";
 import Papa from "papaparse";
 
 import XLSX from "xlsx";
+import { decideEligibility } from "./eligibility";
+import { loadStripIndex, stripCfaAt, type TractRow } from "./strips";
 
 // Bun-specific: import.meta.dir is the directory of this source file.
 // Using it (rather than process.cwd()) anchors static-file paths to the
@@ -23,6 +25,8 @@ const cfaByTract = new Map<string, string>();
 // Lets us tell "tract is listed but has no CFA" (NOT_IN_ICFA) apart from
 // "tract isn't in our list at all" (NOT_IN_TRACT_LIST).
 const knownTracts = new Set<string>();
+const regionByTract = new Map<string, string>();
+let tractRows: TractRow[] = [];
 
 // tracts.csv CFA values carry long descriptions, e.g.
 // "Bakersfield (PG&E zonal gas decommissioning area)" or
@@ -37,10 +41,14 @@ try {
 	const tractPath = path.resolve("./data/tracts.csv");
 	if (fs.existsSync(tractPath)) {
 		const tractCsv = fs.readFileSync(tractPath, "utf-8");
-		const { data } = Papa.parse<{ tract: string; CFA: string }>(tractCsv, {
-			header: true,
-			skipEmptyLines: true,
-		});
+		const { data } = Papa.parse<{ tract: string; region: string; CFA: string }>(
+			tractCsv,
+			{
+				header: true,
+				skipEmptyLines: true,
+			},
+		);
+		tractRows = data;
 		for (const row of data) {
 			const tractRaw = String(row.tract ?? "").trim();
 			if (!tractRaw) continue;
@@ -49,6 +57,7 @@ try {
 			// the two formats line up. Mirrors the backend's normalization.
 			const tract = tractRaw.padStart(11, "0");
 			knownTracts.add(tract);
+			regionByTract.set(tract, String(row.region ?? "").trim());
 			const cfa = row.CFA?.trim();
 			if (cfa) cfaByTract.set(tract, shortenCfa(cfa));
 		}
@@ -66,6 +75,12 @@ try {
 		err,
 	);
 }
+
+// Half-mile DAC strips in tracts bordering a CFA tract (see strips.ts).
+const adjacentStrips = loadStripIndex(
+	path.resolve("./data/cfa_adjacent_strips.geojson"),
+	tractRows,
+);
 
 // --- Load Building Climate Zones by ZIP Code (optional) ---
 let climateZoneByZip = new Map<string, string>();
@@ -199,6 +214,9 @@ type AddressResult = {
 	CARB_PriorityPopulation: string;
 	WithinHalfMileOfADisadvantagedCommunity: string;
 	"Potential CFA": string;
+	AdjacentCFA: string;
+	Eligible: string;
+	EligibilityReason: string;
 };
 
 type BatchRowResult =
@@ -413,6 +431,24 @@ async function lookupAddress(
 			potentialCfa = cfaByTract.get(paddedTract) || NOT_IN_ICFA;
 		}
 
+		// --- Eligibility (same rule as the main backend) ---
+		const isCfa = cfaByTract.has(paddedTract);
+		const region = regionByTract.get(paddedTract) ?? "";
+		const inDacBuffer = halfMileDacLabel === "Yes";
+		const adjacentCfa =
+			censusTract && region === "Central" && !isCfa && inDacBuffer
+				? stripCfaAt(adjacentStrips, paddedTract, Number(lon), Number(lat))
+				: null;
+		const eligibility = decideEligibility({
+			tract: censusTract,
+			known: knownTracts.has(paddedTract),
+			region,
+			isCfa,
+			inDac: ["yes", "true"].includes(normalizeOverlayLabel(value.dac)),
+			inDacBuffer,
+			adjacentCfa,
+		});
+
 		const result: AddressResult = {
 			InputAddress: address,
 			StandardizedAddress: `${candidate.delivery_line_1}, ${candidate.last_line}`,
@@ -427,12 +463,18 @@ async function lookupAddress(
 			CARB_PriorityPopulation: carbPriorityClean || "N/A",
 			WithinHalfMileOfADisadvantagedCommunity: halfMileDacLabel,
 			"Potential CFA": potentialCfa,
+			AdjacentCFA: adjacentCfa ?? "",
+			Eligible: eligibility.eligible ? "Yes" : "No",
+			EligibilityReason: eligibility.reason,
 		};
 
 		return { ok: true, data: result };
 	} catch (err) {
 		// AbortSignal.timeout() throws TimeoutError per spec; Bun may throw AbortError instead.
-		if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+		if (
+			err instanceof Error &&
+			(err.name === "TimeoutError" || err.name === "AbortError")
+		) {
 			if (attempt < 1) {
 				// One automatic retry after a short pause — recovers most transient
 				// Smarty hangs without masking genuine rate-limit exhaustion.
@@ -631,7 +673,10 @@ async function processBatchFile(job: BatchJob, file: File) {
 					// Do not log the address (PII).
 					console.error("Error processing an address:", err);
 					job.errors += 1;
-					job.results.push({ InputAddress: address, Error: "Processing failed" });
+					job.results.push({
+						InputAddress: address,
+						Error: "Processing failed",
+					});
 					recordError("Processing failed", "batch", job.id);
 				} finally {
 					job.processed += 1;
@@ -654,6 +699,9 @@ async function processBatchFile(job: BatchJob, file: File) {
 		"CARB_PriorityPopulation",
 		"WithinHalfMileOfADisadvantagedCommunity",
 		"Potential CFA",
+		"AdjacentCFA",
+		"Eligible",
+		"EligibilityReason",
 		"Error",
 	];
 	job.csv = Papa.unparse(

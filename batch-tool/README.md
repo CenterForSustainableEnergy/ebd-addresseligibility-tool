@@ -175,7 +175,25 @@ curl "http://localhost:8282/api/errors?limit=50&source=batch"
 `InputAddress`, `StandardizedAddress`, `ZipCode`, `County`, `CensusTract`,
 `AssemblyDistrict`, `SenateDistrict`, `CaliforniaClimateZone`,
 `DisadvantagedCommunity`, `LowIncomeCommunity`, `CARB_PriorityPopulation`,
-`WithinHalfMileOfADisadvantagedCommunity`, `CFA`, `Error`.
+`WithinHalfMileOfADisadvantagedCommunity`, `Potential CFA`, `AdjacentCFA`,
+`Eligible`, `EligibilityReason`, `Error`.
+
+`Eligible` applies the same geographic rule as the main eligibility tool, so a
+batch row and a widget lookup for the same address agree. `EligibilityReason`
+is one of:
+
+| Reason | Eligible | Meaning |
+| --- | --- | --- |
+| `in_dac` | Yes | CFA tract, home in a DAC |
+| `dac_buffer` | Yes | CFA tract, home within half a mile of a DAC |
+| `cfa_adjacent_dac_buffer` | Yes | Non-CFA tract bordering a CFA tract, home within half a mile of that CFA tract's DAC part (`AdjacentCFA` names the CFA) |
+| `central_not_dac` | No | CFA tract, but not in or near a DAC |
+| `central_not_cfa` | No | Central, not a CFA tract and not in a strip |
+| `outside_central` | No | Northern or Southern region (some of these tracts carry a CFA label for those regions' programs; `Potential CFA` shows it) |
+| `not_in_tract_list` / `no_tract` | No | Tract missing from `tracts.csv`, or none returned |
+
+The strips come from `data/cfa_adjacent_strips.geojson`; see the main
+[README](../README.md#updating-the-cfa-list) for when to rebuild it.
 
 Rows that fail populate only `InputAddress` and `Error`; the remaining columns are
 blank.
