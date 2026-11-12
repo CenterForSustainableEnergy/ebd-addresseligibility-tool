@@ -2789,7 +2789,7 @@ tract,region,eligible,CFA
 6013360101,Northern,TRUE,"Refinery corridor along the Sac river, Richmond, Antioch"
 6085505014,Northern,FALSE,
 6085504808,Northern,FALSE,
-6029002816,Central,FALSE,
+6029002816,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6077000402,Central,FALSE,
 6037670324,Southern,FALSE,
 6059063500,Southern,FALSE,
@@ -5122,7 +5122,7 @@ tract,region,eligible,CFA
 6107002903,Central,FALSE,
 6077001600,Central,FALSE,
 6019006407,Central,FALSE,
-6029002813,Central,FALSE,
+6029002813,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6047002100,Central,FALSE,
 6027000800,Central,FALSE,
 6047001604,Central,FALSE,
@@ -5648,7 +5648,7 @@ tract,region,eligible,CFA
 6029003814,Central,FALSE,
 6099001603,Central,FALSE,
 6019005529,Central,FALSE,
-6029003112,Central,FALSE,
+6029003112,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6031000406,Central,FALSE,
 6101051100,Northern,FALSE,
 6077002202,Central,FALSE,
@@ -5669,7 +5669,7 @@ tract,region,eligible,CFA
 6085512307,Northern,FALSE,
 6095251701,Northern,FALSE,
 6095252306,Northern,FALSE,
-6029003137,Central,FALSE,
+6029003137,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6037408003,Southern,FALSE,
 6037540901,Southern,FALSE,
 6107003902,Central,FALSE,
@@ -5949,7 +5949,7 @@ tract,region,eligible,CFA
 6017030801,Northern,FALSE,
 6017031800,Northern,FALSE,
 6029002821,Central,FALSE,
-6029003136,Central,FALSE,
+6029003136,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6077003213,Central,FALSE,
 6077003214,Central,FALSE,
 6029003817,Central,FALSE,
@@ -6332,7 +6332,7 @@ tract,region,eligible,CFA
 6037602505,Southern,FALSE,
 6111004715,Central,FALSE,
 6037550201,Southern,FALSE,
-6029003218,Central,FALSE,
+6029003218,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6065044104,Southern,FALSE,
 6037533104,Southern,FALSE,
 6111004710,Central,FALSE,
@@ -7118,7 +7118,7 @@ tract,region,eligible,CFA
 6029006003,Central,FALSE,
 6037406601,Southern,FALSE,
 6013366001,Northern,TRUE,"Refinery corridor along the Sac river, Richmond, Antioch"
-6029003125,Central,FALSE,
+6029003125,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6037404203,Southern,FALSE,
 6111004901,Central,FALSE,
 6037910601,Southern,FALSE,
@@ -7207,7 +7207,7 @@ tract,region,eligible,CFA
 6065043523,Southern,FALSE,
 6037570304,Southern,FALSE,
 6071000207,Southern,FALSE,
-6029003216,Central,FALSE,
+6029003216,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6095251400,Northern,FALSE,
 6111008303,Central,FALSE,
 6111009300,Central,FALSE,
@@ -7282,7 +7282,7 @@ tract,region,eligible,CFA
 6001451602,Northern,FALSE,
 6037602801,Southern,FALSE,
 6059075301,Southern,FALSE,
-6029003209,Central,FALSE,
+6029003209,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6095250900,Northern,FALSE,
 6065042717,Southern,FALSE,
 6037532001,Southern,FALSE,
@@ -7808,7 +7808,7 @@ tract,region,eligible,CFA
 6029005409,Central,FALSE,
 6029002902,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6077003501,Central,FALSE,
-6029003113,Central,FALSE,
+6029003113,Central,TRUE,Bakersfield (PG&E zonal gas decommissioning area) 
 6077003409,Central,FALSE,
 6047002403,Central,FALSE,
 6019003808,Central,FALSE,
